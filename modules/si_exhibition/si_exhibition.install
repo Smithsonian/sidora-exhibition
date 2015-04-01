@@ -1,0 +1,27 @@
+<?php
+
+/**
+ * @file
+ *
+ * The install/requirement hooks for this module.
+ */
+
+/**
+ * Implements hook_requirements().
+ */
+function si_exhibition_requirements($phase) {
+  $t = get_t();
+  $requirements = array(
+    'flexpaper' => array('title' => $t('FlexPaper'))
+  );
+  if (file_exists('sites/all/libraries/flexpaper/FlexPaperViewer.swf')) {
+    $requirements['flexpaper']['severity'] = REQUIREMENT_OK;
+    $requirements['flexpaper']['value'] = $t('Installed');
+  }
+  else {
+    $requirements['flexpaper']['severity'] = REQUIREMENT_ERROR;
+    $requirements['flexpaper']['value'] = $t('Not found');
+    $requirements['flexpaper']['description'] = $t('FlexPaper is required for some parts of the Smithsonian Exhibition module. Download the flash version of FlexPaper <a href="@url" title="FlexPaper">here</a> and place it in the libraries folder. e.g. @path', array('@url' => 'http://flexpaper.devaldi.com/download/', '@path' => '/sites/all/libraries/flexpaper/FlexPaperViewer.swf'));
+  }
+  return $requirements;
+}

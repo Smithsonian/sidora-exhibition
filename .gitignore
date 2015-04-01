@@ -1,0 +1,18 @@
+# Ignore everything in repository root 
+/*
+
+# Files to not ignore
+!/.gitignore
+!/some_other_files
+
+# Ignore all modules except si_exhibition
+!/modules/
+/modules/*
+!/modules/si_exhibition
+!/modules/si_exhibition/*
+
+# Ignore all themes except smithsonian-theme
+!/themes/
+/themes/*
+!/themes/smithsonian-theme
+!/themes/smithsonian-theme/*

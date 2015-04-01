@@ -1,0 +1,157 @@
+
+name = Smithsonian
+description = Smithsonian theme. Fusion Starter sub-theme. Requires <a href="http://drupal.org/project/fusion">Fusion Core</a> and the <a href="http://drupal.org/project/skinr">Skinr</a> module to enable easy point-and-click theming.
+base theme = fusion_core
+core = 7.x
+
+screenshot = logo.png
+
+stylesheets[all][] = css/fusion-starter-style.css
+stylesheets[all][] = css/grid16-960.css
+stylesheets[all][] = css/smithsonian.css
+stylesheets[all][] = css/smithsonian-solr.css ; solr theming for specific smithsonian project.
+stylesheets[all][] = css/smithsonian-skinr.css
+
+scripts[] = js/scripts.js
+
+regions[sidebar_first] = sidebar first
+regions[sidebar_second] = sidebar last
+regions[header_top] = header top
+regions[header] = header
+regions[preface_top] = preface top
+regions[preface_bottom] = preface bottom
+regions[content_top] = content top
+regions[content] = content
+regions[content_bottom] = content bottom
+regions[postscript_top] = postscript top
+regions[postscript_bottom] = postscript bottom
+regions[footer] = footer
+regions[node_top] = node top
+regions[node_bottom] = node bottom
+regions[bottom] = bottom
+
+features[] = logo
+features[] = name
+features[] = slogan
+features[] = mission
+features[] = node_user_picture
+features[] = comment_user_picture
+features[] = search
+features[] = favicon
+features[] = primary_links
+features[] = secondary_links
+
+; Default theme settings
+settings[theme_grid] = grid16-fluid
+settings[theme_grid_options][] = grid16-960
+settings[theme_grid_options][] = grid16-fluid
+settings[fluid_grid_width] = fluid-100
+settings[theme_font_size] = font-size-12
+settings[sidebar_layout] = sidebars-split
+settings[sidebar_first_width] = 3
+settings[sidebar_last_width] = 3
+
+; Smithsonian general styles
+skinr[smithsonian-general-styles][title] = Smithsonian styles
+skinr[smithsonian-general-styles][type] = checkboxes
+skinr[smithsonian-general-styles][features][] = block
+skinr[smithsonian-general-styles][features][] = panels_pane
+skinr[smithsonian-general-styles][description] = These are styles that are specific to the Smithsonian style.
+skinr[smithsonian-general-styles][options][1][label] = padding (if no other style applied)
+skinr[smithsonian-general-styles][options][1][class] = smithsonian-padding
+skinr[smithsonian-general-styles][options][2][label] = white background
+skinr[smithsonian-general-styles][options][2][class] = smithsonian-white
+skinr[smithsonian-general-styles][options][3][label] = thin grey border, light grey background
+skinr[smithsonian-general-styles][options][3][class] = smithsonian-border
+skinr[smithsonian-general-styles][options][4][label] = Blue body, white text
+skinr[smithsonian-general-styles][options][4][class] = smithsonian-blue-body
+skinr[smithsonian-general-styles][options][5][label] = bold content text
+skinr[smithsonian-general-styles][options][5][class] = smithsonian-bold
+
+; Smithsonian header styles
+skinr[smithsonian-header-styles][title] = Smithsonian header styles
+skinr[smithsonian-header-styles][type] = checkboxes
+skinr[smithsonian-header-styles][features][] = block
+skinr[smithsonian-header-styles][features][] = panels_pane
+skinr[smithsonian-header-styles][description] = Smithsonian header styles.
+skinr[smithsonian-header-styles][options][1][label] = <span class="preview-text">Uppercase title <span class="preview-icon" id="smithsonian-header-styles-smithsonian-uppercase-title"></span></span>
+skinr[smithsonian-header-styles][options][1][class] = smithsonian-uppercase-title
+skinr[smithsonian-header-styles][options][2][label] = <span class="preview-text">Bold title<span class="preview-icon" id="smithsonian-header-styles-smithsonian-bold-title"></span></span>
+skinr[smithsonian-header-styles][options][2][class] = smithsonian-title-bold
+skinr[smithsonian-header-styles][options][3][label] = <span class="preview-text">White title, grey background<span class="preview-icon" id="smithsonian-header-styles-smithsonian-darkbg"></span></span>
+skinr[smithsonian-header-styles][options][3][class] = smithsonian-title-darkbg
+
+; Smithsonian title size
+skinr[smithsonian-header-size][title] = Smithsonian header size
+skinr[smithsonian-header-size][type] = select
+skinr[smithsonian-header-size][features][] = block
+skinr[smithsonian-header-size][features][] = panels_pane
+skinr[smithsonian-header-size][description] = Choose the size of the block header
+skinr[smithsonian-header-size][options][1][label] = small
+skinr[smithsonian-header-size][options][1][class] = smithsonian-header-size-small
+skinr[smithsonian-header-size][options][2][label] = medium
+skinr[smithsonian-header-size][options][2][class] = smithsonian-header-size-medium
+skinr[smithsonian-header-size][options][3][label] = large
+skinr[smithsonian-header-size][options][3][class] = smithsonian-header-size-large
+skinr[smithsonian-header-size][options][4][label] = extra large
+skinr[smithsonian-header-size][options][4][class] = smithsonian-header-size-xl
+
+; Smithsonian panels_pane and panels_region
+
+; Smithsonian panels_region general styles
+skinr[smithsonian-region-general-styles][title] = Smithsonian region styles
+skinr[smithsonian-region-general-styles][type] = checkboxes
+skinr[smithsonian-region-general-styles][features][] = panels_region
+skinr[smithsonian-region-general-styles][description] = These are styles that are specific to the Smithsonian style. These styles don't include padding. This is something that has to be set in the block styles.
+skinr[smithsonian-region-general-styles][options][1][label] = white background (no padding)
+skinr[smithsonian-region-general-styles][options][1][class] = smithsonian-region-white
+skinr[smithsonian-region-general-styles][options][2][label] = thin grey border, light grey background (no padding)
+skinr[smithsonian-region-general-styles][options][2][class] = smithsonian-region-border
+
+
+
+; Smithsonian panels_pane general settings
+;skinr[smithsonian-pane-general-styles][title] = Smithsonian styles
+;skinr[smithsonian-pane-general-styles][type] = checkboxes
+;skinr[smithsonian-pane-general-styles][features][] = panels_pane
+;skinr[smithsonian-pane-general-styles][description] = These are styles that are specific to the Smithsonian style.
+;skinr[smithsonian-pane-general-styles][options][1][label] = padding (if no other style applied)
+;skinr[smithsonian-pane-general-styles][options][1][class] = smithsonian-pane-padding
+;skinr[smithsonian-pane-general-styles][options][2][label] = white background (don't apply if the region has this style applied)
+;skinr[smithsonian-pane-general-styles][options][2][class] = smithsonian-pane-white
+;skinr[smithsonian-pane-general-styles][options][3][label] = thin grey border, light grey background (don't apply if the region has this style applied)
+;skinr[smithsonian-pane-general-styles][options][3][class] = smithsonian-pane-border
+;skinr[smithsonian-pane-general-styles][options][4][label] = Blue body, white text
+;skinr[smithsonian-pane-general-styles][options][4][class] = smithsonian-pane-blue-body
+;skinr[smithsonian-pane-general-styles][options][5][label] = bold content text
+;skinr[smithsonian-pane-general-styles][options][5][class] = smithsonian-pane-bold
+
+
+
+
+
+
+
+
+
+
+
+
+; Disable some default options
+;skinr[fusion-content-alignment] = ''
+skinr[fusion-general-styles] = ''
+
+; Inherit Skinr styles from Fusion Core
+skinr[options][inherit_skins] = true
+
+; Disable 12 column grid block widths inherited from fusion_core
+skinr[grid12-width] = ''
+
+; Sample Skinr style (uncomment to use, see Skinr section in CSS)
+;skinr[fusion-example-styles][title] = Sample Skinr block styles
+;skinr[fusion-example-styles][type] = checkboxes
+;skinr[fusion-example-styles][features][] = block
+;skinr[fusion-example-styles][options][1][label] = My sample Skinr style
+;skinr[fusion-example-styles][options][1][class] = fusion-example-stylename
+
+

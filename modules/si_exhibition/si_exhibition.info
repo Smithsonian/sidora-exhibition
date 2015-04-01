@@ -1,0 +1,7 @@
+name = Smithsonian Exhibition
+description = Modifies the object display for the Smithsonian Exhibition Site.
+package = Smithsonian
+dependencies[] = tuque_wrapper
+dependencies[] = si_models
+dependencies[] = shadowbox
+core = 7.x

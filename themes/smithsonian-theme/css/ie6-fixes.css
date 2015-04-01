@@ -1,0 +1,36 @@
+
+/* Alpha transparency png fix */
+/* To use: uncomment & change path to match your Fusion Core location*/
+/*
+div.pngfix,
+#logo img {
+  behavior: url(/sites/all/themes/fusion/fusion_core/js/iepngfix.htc);
+}
+*/
+
+/* fix for panel nodes */
+#content-inner-inner
+{
+    margin-left: 0px;
+    margin-right: 0px;
+}
+/* fix for mini panels (blocks) */
+body .block-panels_mini .inner
+{
+    margin-left: 0px;
+    margin-right: 0px;
+}
+body .block-panels_mini .inner .inner
+{
+    margin-left: 5px;
+    margin-right: 5px;
+}
+
+
+/* dark bg title */
+.smithsonian-title-darkbg h2
+{
+    margin-left: -10px;
+    margin-right: -10px;
+    left: 0px;
+}

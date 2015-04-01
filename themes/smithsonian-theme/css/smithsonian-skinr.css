@@ -1,0 +1,225 @@
+/* 
+    Document   : smithsonian-skinr
+    Created on : 10-Jun-2011, 2:43:25 PM
+    Author     : Danny
+    Description:
+        Purpose of the stylesheet follows.
+*/
+
+
+/**
+ * General styles
+ */
+
+/* border */
+.smithsonian-border .inner
+{
+    border: 1px solid #ccc;
+
+    padding: 15px 10px;
+    /* added this background-color for IE6. No color doesn't mean transparent 
+    for IE6, instead it renders it as dark grey. That's why I just give it the 
+    site's background color. This gets overwritten if you choose a white
+    background */
+    background-color: #eee; 
+
+    border-radius: 5px 5px 5px 5px;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+
+    -webkit-box-shadow: 0 1px 10px rgba(0, 0, 0, .2);
+    -moz-box-shadow: 0 1px 10px rgba(0, 0, 0, .2);
+    box-shadow: 0px 0px 6px 1px rgba(110, 110, 110, .1);
+    behavior: url('/sites/all/themes/smithsonian/pie/PIE.htc');
+    z-index: 0;
+}
+ 
+ 
+/* white background */
+.smithsonian-white .inner
+{
+    background: white;
+
+    padding: 15px 10px;
+
+    border-radius: 5px 5px 5px 5px;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+    
+    -webkit-box-shadow: 0 1px 10px rgba(0, 0, 0, .2);
+    -moz-box-shadow: 0 1px 10px rgba(0, 0, 0, .2);
+    box-shadow: 0px 0px 6px 1px rgba(110, 110, 110, .1);
+    behavior: url('/sites/all/themes/smithsonian/pie/PIE.htc');
+    z-index: 0;
+}
+
+
+
+
+/* padding */
+.smithsonian-padding .inner
+{
+    padding: 15px 10px;
+}
+
+/* blue background */
+.smithsonian-blue-body h2,
+.smithsonian-blue-body .content
+{
+    color: #fff;
+}
+.smithsonian-blue-body .content a,
+.smithsonian-blue-body .content a:visited,
+.smithsonian-blue-body .content a:hover,
+.smithsonian-blue-body .content a:active
+{
+    color: #fff;
+    text-decoration: underline;
+}
+.smithsonian-blue-body .inner
+{
+    background-color: #0179AA;
+    
+    padding: 15px 10px;
+
+    border-radius: 5px 5px 5px 5px;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+    
+    -webkit-box-shadow: 0 1px 10px rgba(0, 0, 0, .2);
+    -moz-box-shadow: 0 1px 10px rgba(0, 0, 0, .2);
+    box-shadow: 0px 0px 6px 1px rgba(110, 110, 110, .1);
+    behavior: url('/sites/all/themes/smithsonian/pie/PIE.htc');
+    z-index: 0;
+}
+
+
+
+
+/**
+ * Header styles
+ */
+
+/* uppercase title */
+.smithsonian-uppercase-title h2
+{
+    text-transform: uppercase;
+}
+#smithsonian-header-styles-smithsonian-uppercase-title
+{
+    
+}
+
+/* bold title */
+.smithsonian-title-bold h2
+{
+    font-weight: bold;
+}
+#smithsonian-header-styles-smithsonian-bold-title
+{
+    
+}
+
+/* dark bg title */
+.smithsonian-title-darkbg h2
+{
+    position: relative;
+    width: 100%;
+    left: -10px;
+    top: -15px;
+    padding: 10px;
+
+    background: none repeat scroll 0 0 #4C4C4C;
+    color: White;
+    border-radius: 5px 5px 0 0;
+    behavior: url('/sites/all/themes/smithsonian/pie/PIE.htc');
+}
+#smithsonian-header-styles-smithsonian-darkbg
+{
+    
+}
+
+/* bold text */
+.smithsonian-bold .inner .content
+{
+    font-weight: bold; 
+}
+
+
+
+
+/**
+ * Header size styles
+ */
+
+.smithsonian-header-size-small h2
+{
+    font-size: 1.2em;
+}
+.smithsonian-header-size-medium h2
+{
+    font-size: 1.6em;
+}
+.smithsonian-header-size-large h2
+{
+    font-size: 1.9em;
+}
+.smithsonian-header-size-xl h2
+{
+    font-size: 2.1em;
+}
+
+
+
+
+/**
+ * Region styles
+ */
+
+/* grey border, light grey background: no padding  */
+.smithsonian-region-border
+{
+    border: 1px solid #ccc;
+
+/*    padding: 15px 10px;*/
+    /* added this background-color for IE6. No color doesn't mean transparent 
+    for IE6, instead it renders it as dark grey. That's why I just give it the 
+    site's background color. This gets overwritten if you choose a white
+    background */
+    background-color: #eee; 
+
+    border-radius: 5px 5px 5px 5px;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+
+    -webkit-box-shadow: 0 1px 10px rgba(0, 0, 0, .2);
+    -moz-box-shadow: 0 1px 10px rgba(0, 0, 0, .2);
+    box-shadow: 0px 0px 6px 1px rgba(110, 110, 110, .1);
+    behavior: url('/sites/all/themes/smithsonian/pie/PIE.htc');
+    z-index: 0;
+}
+/* white background: no padding  */
+.smithsonian-region-white
+{
+    background: white;
+
+/*    padding: 15px 10px;*/
+
+    border-radius: 5px 5px 5px 5px;
+    -webkit-border-radius: 5px;
+    -moz-border-radius: 5px;
+    
+    -webkit-box-shadow: 0 1px 10px rgba(0, 0, 0, .2);
+    -moz-box-shadow: 0 1px 10px rgba(0, 0, 0, .2);
+    box-shadow: 0px 0px 6px 1px rgba(110, 110, 110, .1);
+    behavior: url('/sites/all/themes/smithsonian/pie/PIE.htc');
+    z-index: 0;
+    
+}
+
+
+
+
+
+
+

@@ -1,0 +1,1696 @@
+<?php
+/**
+ * @file
+ *
+ * Implements hooks and callbacks for this module.
+ */
+define('FLEXPAPER_VIEWER_PATH', 'sites/all/libraries/flexpaper/FlexPaperViewer.swf');
+
+define('SIDORA_EX_DUMP', FALSE);
+
+/**
+ * Implements hook_menu().
+ */
+function si_exhibition_menu() {
+  return array(
+    'admin/settings/si/exhibition' => array(
+      'title' => 'Smithsonian Exhibition',
+      'description' => 'Configure the display of the Exhibition repository.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('si_exhibition_admin_settings'),
+      'access arguments' => array('administer site configuration'),
+      'file' => 'si_exhibition.admin.inc',
+      'type' => MENU_NORMAL_ITEM,
+    ),
+    'si/exhibition/datastream' => array(
+      'description' => 'Fetch the datastream for the given object using ajax.',
+      'page callback' => 'si_exhibition_get_datastream_as_json',
+      'access callback' => true,
+      'type' => MENU_CALLBACK,
+    ),
+    'si/exhibition/xsl' => array(
+      'description' => 'Place to get xsl stylesheets for metadata presentation',
+      'page callback' => 'si_exhibition_xsl',
+      'page arguments' => array(1),
+      'access callback' => true,
+      'type' => MENU_CALLBACK,
+    ),
+    'public' => array(
+      'description' => 'The public "name" of the exhibition custom url.',
+      'page callback' => 'si_exhibition_custom_url',
+      'page arguments' => array(1),
+      'access callback' => true,
+      'type' => MENU_CALLBACK,
+    ),
+    'si/exhibition/flexpaper/%' => array( // @todo check to see if this can be merged into si/exhibition/datastream
+      'description' => 'View the OBJ.swf datastream of the given object using FlexPaper',
+      'page callback' => 'si_exhibition_flexpaper',
+      'page arguments' => array(3),
+      'access callback' => true,
+      'type' => MENU_CALLBACK,
+    ),
+    'fedora' => array(
+      'description' => 'Overrides the islandora call to Fedora',
+      'page callback' => 'si_exhibition',
+      'access callback' => true,
+      'type' => MENU_CALLBACK,
+    ),
+    'fedora/repository' => array(
+      'description' => 'Overrides the islandora call to a Fedora repository',
+      'page callback' => 'si_exhibition',
+      'access callback' => true,
+      'type' => MENU_CALLBACK,
+    ),
+  );
+}
+
+/**
+ * Implements hook_theme().
+ */
+function si_exhibition_theme($existing, $type, $theme, $path) {
+  return array(
+    'page_exhibition' => array(
+      'render element' => 'page',
+      'template' => '../../themes/smithsonian-theme/templates/page',
+    ),
+    'si_exhibition_object' => array(
+      'file' => 'si_exhibition.theme.inc',
+      'template' => 'templates/si-exhibition-object',
+      'variables' => array(
+        'object' => NULL
+      ),
+    ),
+    'si_exhibition_flexpaper' => array(
+      'file' => 'si_exhibition.theme.inc',
+      'template' => 'templates/si-exhibition-flexpaper',
+      'variables' => array(
+        'pid' => NULL
+      ),
+    ),
+    'si_exhibition_parent_concepts' => array(
+      'file' => 'si_exhibition.theme.inc',
+      'variables' => array(
+        'object' => NULL
+      ),
+    ),
+    'si_exhibition_child_concepts' => array(
+      'file' => 'si_exhibition.theme.inc',
+      'variables' => array(
+        'object' => NULL
+      ),
+    ),
+    'si_exhibition_navigation' => array(
+      'file' => 'si_exhibition.theme.inc',
+      'variables' => array(
+        'object' => NULL
+      ),
+    ),
+    'si_exhibition_resources' => array(
+      'file' => 'si_exhibition.theme.inc',
+      'template' => 'templates/si-exhibition-resources',
+      'variables' => array(
+        'object' => NULL
+      ),
+    ),
+    'si_exhibition_resource_table' => array(
+      'file' => 'si_exhibition.theme.inc',
+      'variables' => array(
+        'resources' => NULL
+      ),
+    ),
+    'si_exhibition_metadata_xmls' => array(
+      'file' => 'si_exhibition.theme.inc',
+      'variables' => array(
+        'object' => NULL
+      ),
+    ),
+    'si_exhibition_metadata' => array(
+      'file' => 'si_exhibition.theme.inc',
+      'variables' => array(
+        'object' => NULL
+      ),
+    ),
+    'si_exhibition_text_datastream' => array(
+      'file' => 'si_exhibition.theme.inc',
+      'variables' => array(
+        'object' => NULL
+      ),
+    ),
+    'si_exhibition_csv_datastream' => array(
+      'file' => 'si_exhibition.theme.inc',
+      'arguments' => array(
+        'object' => NULL
+      ),
+    ),
+    'si_exhibition_page_title' => array(
+      'file' => 'si_exhibition.theme.inc',
+      'variables' => array(
+        'object' => NULL
+      ),
+    )
+  );
+}
+
+/**
+ * Implementation of hook_block_info().
+ */
+function si_exhibition_block_info() {
+  $blocks = array();
+
+  if (!_si_show_exhibition()) {
+    return $blocks;
+  }
+
+  if (($expose_block = variable_get('si_exhibition_expose_block', 'no')) == 'no') {
+    return $blocks;
+  }
+
+  $base = array(
+    'cache' => DRUPAL_NO_CACHE,
+    'status' => 1,
+    //'visibility' => BLOCK_VISIBILITY_NOTLISTED,
+  );
+
+  $blocks['seu_nav'] = $base + array(
+    'info' => t('SI Navigation'),
+  );
+  $blocks['seu_parent'] = $base + array(
+    'info' => t('SI Parent Concepts Navigation'),
+  );
+  $blocks['seu_child'] = $base + array(
+    'info' => t('SI Child Concepts Navigation'),
+  );
+  $blocks['seu_f'] = $base + array(
+    'info' => t('SI Exhibition User Footer'),
+  );
+  $blocks['seu_h'] = $base + array(
+    'info' => t('SI Exhibition User Header'),
+  );
+  $blocks['seu_pre'] = $base + array(
+    'info' => t('SI Exhibition User Pre-Content'),
+  );
+  $blocks['seu_post'] = $base + array(
+    'info' => t('SI Exhibition User Post-Content'),
+  );
+  $blocks['seu_sf'] = $base + array(
+    'info' => t('SI Exhibition User Sidebar First'),
+  );
+  $blocks['seu_sl'] = $base + array(
+    'info' => t('SI Exhibition User Sidebar Last'),
+  );
+  $blocks['seu_nav_first'] = $base + array(
+    'info' => t('SI Exhibition Navigation (Left Top)'),
+  );
+  $blocks['seu_nav_last'] = $base + array(
+    'info' => t('SI Exhibition Navigation (Right Top)'),
+  );
+  $blocks['seu_nav_first_bottom'] = $base + array(
+    'info' => t('SI Exhibition Navigation (Left Bottom)'),
+  );
+  $blocks['seu_nav_last_bottom'] = $base + array(
+    'info' => t('SI Exhibition Navigation (Right Bottom)'),
+  );
+  return $blocks;
+}
+
+/**
+ * Implements hook_block_view().
+ */
+function si_exhibition_block_view($delta='') {
+  $forbidden = false;
+  $not_found = false;
+  $header = drupal_get_http_header('Status');
+
+  switch ($header) {
+    case '403 Forbidden':
+      $forbidden = true;
+      break;
+
+    case '404 Not Found':
+      $not_found = true;
+      break;
+  }
+
+  // Only ever display in /fedora/* when the user has access and the resource exists.
+  if (arg(0) == 'fedora' && !$forbidden && !$not_found) {
+    $pid_for_config = arg(2);
+    $pid = (arg(2) ? arg(2) : variable_get('fedora_repository_pid', 'si:root'));
+    $repo = tuque_wrapper_get_repository_instance();
+    $object = $repo->getObject($pid); // We know it exists if we got passed the header checks
+    
+    switch ($delta) {
+      case "seu_nav":
+        $block = array(
+          'subject' => t('SI Navigation'),
+          'content' => theme('si_exhibition_navigation', array('object'=>$object)),
+        );
+        break;
+      case "seu_parent":
+        $block = array(
+          'subject' => t('SI Parent Concepts'),
+          'content' => theme('si_exhibition_parent_concepts', array('object'=>$object)),
+        );
+        break;
+      case "seu_child":
+        $block = array(
+          'subject' => t('SI Child Concepts'),
+          'content' => theme('si_exhibition_child_concepts', array('object'=>$object)),
+        );
+        break;
+      default:
+        $path = filter_input(INPUT_GET, 'path');
+        //if we have a path, make sure we can access that path
+        if (!empty($path)){
+          $path_list = explode(',',$path);
+          if (!empty($path_list[0])){
+            $pid_for_config = $path_list[0];
+          }
+        }
+
+        $se = si_exhibition_get_item_display_config($pid_for_config, arg(2));
+
+        $block = array(
+          'subject' => '',
+          'content' => (isset($se[$delta])?$se[$delta]:''),
+        );
+        
+        break;
+    }
+
+    return $block;
+  }
+}
+
+function _si_show_exhibition(){
+    global $bad_path_set;
+    global $bad_path;
+    if ($bad_path_set) return !$bad_path;
+    $tree_pid_list = array();
+    $bad_path = false;
+    $path = filter_input(INPUT_GET, 'path');
+    if (!empty($path)){
+      $path_list = explode(',',$path);
+      if (!empty($path_list[0])){
+        $tree = get_pid_tree($path_list[0], null, $tree_pid_list);
+        if (!in_array(arg(2),$tree_pid_list)){
+          $bad_path = true;
+        }
+      }
+    }
+    $bad_path_set = TRUE;
+    return !($bad_path);
+}
+
+
+/**
+ * Implementation of hook_preprocess_page().
+ */
+function si_exhibition_preprocess_page(&$variables) {
+  si_exhibition_update_js($variables);
+  $headers = drupal_get_http_header();
+  $forbidden = array_search('HTTP/1.1 403 Forbidden', $headers) !== FALSE;
+  $not_found = array_search('HTTP/1.1 404 Not Found', $headers) !== FALSE;
+  if (arg(0) == 'fedora' && arg(1) == 'repository'  && !$forbidden && !$not_found) {
+    $variables['theme_hook_suggestions'][] = 'page_exhibition';
+    $variables['title'] = NULL; // Title is displayed as part of the page content.
+    $se = array();
+    $pid_for_config = arg(2);
+    $path = filter_input(INPUT_GET, 'path');
+    //if we have a path, make sure we can access that path
+    if (!empty($path)){
+      $path_list = explode(',',$path);
+      if (!empty($path_list[0])){
+        $pid_for_config = $path_list[0];
+      }
+    }
+    try {
+      $se = si_exhibition_get_item_display_config($pid_for_config, arg(2));
+      if ($se['error'] == true) {
+        $show_exhibition = false;
+      }
+      //logo is the image
+      //site_slogan is under the name
+      //site_name is the main name
+      $variables['logo'] = $se['logo'];
+      $variables['site_name'] = $se['title'];
+      //$variables['site_slogan'] = ' sitey slogany'.arg(2);
+      $variables['sidora_exhibition'] = $se;
+      $variables['primary_links_tree'] = drupal_render(menu_tree_output(menu_tree_all_data('main-menu')));
+    } catch(Exception $e) {
+      print ('exception'.$e->getMessage().'  '.$e->getTraceAsString());//BBB
+      exit();
+      $show_exhibition = false;
+    }
+  }
+}
+
+/**
+ * Menu callback that replaces the default callback for fedora/repository.
+ */
+function si_exhibition($pid = NULL, $dsid = NULL) {
+  $pid = isset($pid) ? $pid : variable_get('fedora_repository_pid', 'si:root');
+  $repo = tuque_wrapper_get_repository_instance();
+  // Check if we can access the repository and the requested object.
+  try {
+    $description = $repo->api->a->describeRepository(); // Check for repository access
+    $object = $repo->getObject($pid); // Check for object access
+  } catch(Exception $e) {
+    $code = $e->getCode();
+    switch($code) {
+      case '404':
+        if(!isset($description)) { // Couldn't reach the repository.
+          watchdog('exhibition', 'Could not reach Fedora repository');
+          drupal_set_message(t('The Fedora repository server is currently unavailable. Please contact the site administrator.'), 'error', FALSE);
+        }
+        watchdog('exhibition', '404 error getting pid:'.$pid.'.');
+        drupal_not_found();
+        break;
+      case '401':
+      case '403':
+        watchdog('exhibition', 'Access denied');
+        drupal_access_denied();
+        break;
+      default:
+        drupal_set_message(t('An error occured when attempting to access the fedora repository. Please contact the site administrator.'), 'error', FALSE);
+        $message = '%type: !message in %function (line %line of %file).';
+        $backtrace = $e->getTrace();
+        $caller = $backtrace[1];
+        $variables = array(
+          '%type' => get_class($e),
+          '!message' => check_plain($e->getMessage()),
+          '%function' => $caller['function'],
+          '%file' => $caller['file'],
+          '%line' => $caller['line']
+        );
+        watchdog('islandora', $message, $variables, WATCHDOG_ERROR, NULL);
+        drupal_not_found();
+        break;
+    }
+    exit();
+  }
+  drupal_add_css(drupal_get_path('module', 'si_exhibition') . '/css/si-exhibition.css');
+  drupal_add_css(drupal_get_path('module', 'si_exhibition') . '/js/jstree/dist/themes/default/style.min.css');
+  if (variable_get('si_exhibition_anonymous_only', FALSE)){
+    if (!si_exhibition_check_view_permission($pid)){
+      watchdog('exhibition', 'si_exhibition_check_view_permission for:'.$pid.' was false');
+      return drupal_not_found();
+    }
+  }
+  if (!_si_show_exhibition()){
+    watchdog('exhibition', '_si_show_exhibition for:'.$pid.' was false');
+    return drupal_not_found();
+  }
+  if ($dsid != NULL) {
+    //Moved this section down from the top 1/27/2015 BBB
+    //Here we know we "should" be able to see it
+    header("Content-Type: ".$object[$dsid]->mimetype);
+    print $object[$dsid]->content;
+    exit();
+    //return call_user_func_array('repository_page', func_get_args()); // Use the default datastream download code.
+  }
+  return theme('si_exhibition_object', array('object'=>$object));
+  exit;
+}
+
+function si_exhibition_check_view_permission($object_pid) {
+  $xacml_dsid = 'POLICY';
+
+  module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
+  module_load_include('inc', 'fedora_repository', 'api/fedora_item');
+  module_load_include('inc', 'islandora_xacml_api', 'Xacml');
+  module_load_include('inc', 'fedora_repository', 'ObjectHelper');
+
+  // when we call in from top level collections in JS get get the
+  // pid being undefined
+  if($object_pid == 'undefined' || !$object_pid) {
+    $object_pid = variable_get('fedora_repository_pid', 'islandora:top');
+  }
+
+  $object = new Fedora_Item($object_pid);
+  if(!$object->exists()) {
+    return false;
+  }
+  $datastreams = $object->get_datastreams_list_as_array();
+
+  module_load_include('inc', 'fedora_repository', 'ContentModel');
+
+  if(array_key_exists($xacml_dsid, $datastreams)) {
+    module_load_include('inc', 'islandora_xacml_api', 'XacmlException');
+
+    // here we populate the form
+    $xml = $object->get_datastream_dissemination($xacml_dsid);
+
+    // some basic error handling
+    try {
+      $xacml = new Xacml($xml);
+    }
+    catch(XacmlException $e) {
+      return false;
+    }
+    $view_user_list = ($xacml->viewingRule->getUsers());
+    foreach($view_user_list as $view_user){
+      if ($view_user == 'anonymous'){
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Menu callback for redirecting to a specific page.
+ *
+ */
+function si_exhibition_custom_url($cu) {
+  $url =
+    variable_get('si_exhibition_data_url', '').
+    'custom_url'.'/'.
+    $cu;
+  $my_pid = file_get_contents( $url  );
+  drupal_goto('fedora/repository/'.$my_pid);
+}
+
+function si_exhibition_xsl(){
+  header('Content-Type: text/xml');
+  print si_exhibition_xsl_string();
+  exit();
+}
+function si_exhibition_xsl_string(){
+  return variable_get('si_exhibition_metadata_xsl',si_exhibition_xsl_string_default());
+}
+function si_exhibition_xsl_string_default(){
+  return '<?xml version="1.0" encoding="UTF-8"?>
+
+<xsl:stylesheet version="1.0"
+xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
+xmlns:mods="http://www.loc.gov/mods/v3"
+xmlns:fits="http://hul.harvard.edu/ois/xml/ns/fits/fits_output"
+xmlns:cpf="urn:isbn:1-931666-33-4"
+>
+
+<xsl:template match="/">
+  <html>
+  <body>
+  <table class="metadata-table">
+    <xsl:for-each select="xml_root/debug">
+    <tr>
+      <td>Debug</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:abstract">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Description</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+ <xsl:for-each select="//mods:subject/mods:topic">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Topic</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+ <xsl:for-each select="//mods:subject/mods:geographic">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Geographic</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:name">
+      <xsl:for-each select="mods:namePart">
+        <xsl:if test="current()!=\'\'">
+        <tr>
+          <td>Name</td>
+          <td><xsl:value-of select="current()"/></td>
+        </tr>
+        </xsl:if>
+      </xsl:for-each>
+      <xsl:for-each select="mods:role/mods:roleTerm">
+        <xsl:if test="current()!=\'\'">
+        <tr>
+          <td>Role</td>
+          <td><xsl:value-of select="current()"/></td>
+        </tr>
+        </xsl:if>
+      </xsl:for-each>
+    </xsl:for-each>
+ <xsl:for-each select="//mods:identifier">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Identifier</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+ <xsl:for-each select="//mods:genre">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Genre</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+ <xsl:for-each select="//mods:note[not(@*)]">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Note</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+ <xsl:for-each select="//mods:originInfo/mods:dateCaptured">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Date Captured</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+ <xsl:for-each select="//mods:physicalLocation">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Physical Location</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+ <xsl:for-each select="//mods:copyInformation/mods:subLocation">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Sub Location</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//fits:fileinfo/fits:created[@toolname=\'Exiftool\']">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Image Capture Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//citeinfo/title">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Camera Site Name</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//citeinfo/othercit">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Camera Deployment ID</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//citeinfo/origin">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Originator</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//citeinfo/geoform">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Format of Geospatial Data</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//descript/abstract">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Camera Deployment Note</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//descript/supplinf">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Purposed Lat and Long</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//spref/horizsys/geograph/latres">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Actual Latitude</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//spref/horizsys/geograph/longres">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Actual Longitude</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//dataqual/lineage/procstep[procdesc=\'Proposed Camera Deployment Begin Date\']/procdate">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Proposed Camera Deployment Begin Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//dataqual/lineage/procstep[procdesc=\'Proposed Camera Deployment End Date\']/procdate">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Proposed Camera Deployment End Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//timeinfo/rngdates/begdate">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Camera Deployment Begin Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//timeinfo/rngdates/enddate">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Camera Deployment End Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//detailed/attr[attrlabl=\'Camera ID\']/attrdomv/edom/edomv">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Camera ID</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//detailed/attr[attrlabl=\'Image Resolution Setting\']/attrdomv/edom/edomv">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Image Resolution Setting</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//detailed/attr[attrlabl=\'Detection Distance\']/attrdomv/edom/edomv">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Detection Distance</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//detailed/attr[attrlabl=\'Sensitivity Setting\']/attrdomv/edom/edomv">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Sensitivity Setting</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//detailed/attr[attrlabl=\'Quiet Period Setting\']/attrdomv/edom/edomv">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Quiet Period Setting</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//detailed/attr[attrlabl=\'Camera Height\']/attrdomv/edom/edomv">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Camera Height</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//detailed/attr[attrlabl=\'Habitat Type\']/attrdomv/edom/edomv">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Habitat Type</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//theme/themekey">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Theme Keyword</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//place/placekey">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Place Keyword</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//keywtax/taxonkey">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Taxonomic Keyword</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//taxoncl/taxonrn">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Taxonomic Rank Name</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//taxoncl/taxonrv">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Taxonomic Rank Value</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//idinfo/accconst">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Access Constraints</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//idinfo/useconst">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Use Constraints</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//idinfo/datacred">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Data Set Credit</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//dataqual/complete">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Camera Failure Details</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//method[methtype=\'Bait\']/methodid/methkey">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Bait Type</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//method[methtype=\'Bait\']/methdesc">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Bait Methodology</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//method[methtype=\'feature\']/methodid/methkey">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Feature</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//method[methtype=\'feature\']/methodid/methdesc">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Feature Description</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//spref/horizsys/geograph/latres">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Actual Latitude</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//spref/horizsys/geograph/longres">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Actual Longitude</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//spref/horizsys/geograph/geogunit">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Geographic Coordinate Units</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//spref/vertdef/altsys/altdatum">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Altitude Datum Name</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//spref/vertdef/altsys/altres">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Elevation</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//spref/vertdef/altsys/altunits">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Altitude Distace Units</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//spref/vertdef/altsys/altenc">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Altitude Encoding Method</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metd">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Metadata Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metrd">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Metadata Review Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metfrd">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Metadata Future Review Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metc/cntinfo/cntperp/cntper">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Contact Person</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metc/cntinfo/cntperp/cntorg">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Organization Name</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metc/cntinfo/cntaddr/address">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Address</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metc/cntinfo/cntaddr/city">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>City</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metc/cntinfo/cntaddr/state">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>State</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metc/cntinfo/cntaddr/postal">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Postal Code</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metc/cntinfo/cntvoice">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Phone</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metc/cntinfo/cntemail">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Email</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metstdn">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Metadata Standard Name</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//metainfo/metstdv">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Metadata Standard Version</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:mods/mods:titleInfo[@type=\'\']/mods:title">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Title</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:mods/mods:titleInfo[@type=\'alternative\']/mods:title">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Alternative Title</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:mods/mods:titleInfo[@type=\'uniform\']/mods:title">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Uniform Title</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:mods/mods:titleInfo[@type=\'translated\']/mods:title">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Translated Title</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:mods/mods:titleInfo[@type=\'abbreviated\']/mods:title">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Abbreviated Title</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:mods/mods:identifier[not(@type)]">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Item ID</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:mods/mods:identifier[@type=\'accessionNumber\']">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Accession / RU</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:role[mods:roleTerm = \'Creator\']/../../mods:name/mods:namePart">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Creator</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:role[mods:roleTerm = \'Contributor\']/../../mods:name/mods:namePart">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Contributor</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:typeOfResource">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Type of Resource</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:genre">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Genre</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:mods/mods:abstract">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Description</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:dateOther[@type=\'range\' and not(@point)]">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Date Range</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:dateOther[@point=\'start\']">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Start Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:dateOther[@point=\'end\']">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>End Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:dateOther/@qualifier">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Date Qualifier</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:location/mods:physicalLocation">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Location</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:shelfLocator">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Shelf Locator</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:url">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>URL</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subLocation">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Sub Location</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:physicalDescription/mods:form">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Physical Description</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:recordInfo/mods:recordOrigin">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Record Creator</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:recordInfo/mods:recordContentSource">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Institute Creator</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:recordInfo/mods:recordCreationDate">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Creation Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:recordInfo/mods:recordChangeDate">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Change Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:accessCondition">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Access Condition</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:note">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Note</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:topic">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Topic</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:geographic">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Geographic Subject</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:hierarchicalGeographic/mods:continent">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Continent</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:hierarchicalGeographic/mods:country">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Country</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:hierarchicalGeographic/mods:province">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>State</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:hierarchicalGeographic/mods:region">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Region</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:hierarchicalGeographic/mods:county">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>County</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:hierarchicalGeographic/mods:city">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>City</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:hierarchicalGeographic/mods:citySection">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>City Section</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:cartographics/mods:coordinates">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Coordinates</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:name[@type=\'conference\']/mods:namePart">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Expedition Name</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:name[@type=\'corporate\' and @displayLabel=\'Vessel\']/mods:namePart">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Vessel Name</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:name[@type=\'corporate\' and @displayLabel=\'Organization\']/mods:namePart">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Organization Name</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:subject/mods:name[@type=\'personal\']/mods:namePart">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Person Name</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:relatedItem/mods:titleInfo/mods:title">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Related Collection Name</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:relatedItem/mods:identifier">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Related Collection ID</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:language/mods:languageTerm[@type=\'text\']">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Language</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//mods:language/mods:scriptTerm[@type=\'text\']">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Script</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//cpf:nameEntry[@localType=\'primary\']/cpf:part">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Project Name (Full)</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//cpf:nameEntry[@localType=\'abbreviation\']/cpf:part">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Project Name (Abbreviation)</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//cpf:function/cpf:descriptiveNote/cpf:p">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>//cpf:function/cpf:term</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//cpf:existDates/cpf:dateRange/cpf:fromDate">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Begin Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//cpf:existDates/cpf:dateRange/cpf:toDate">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>End Date</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//cpf:place/cpf:placeEntry[@localType=\'address\']">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Project Location</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+    <xsl:for-each select="//cpf:place/cpf:placeEntry[@localType=\'region\']">
+    <xsl:if test="current()!=\'\'">
+    <tr>
+      <td>Region</td>
+      <td><xsl:value-of select="current()"/></td>
+    </tr>
+    </xsl:if>
+    </xsl:for-each>
+
+
+
+
+
+
+
+
+
+  </table>
+  </body>
+  </html>
+</xsl:template>
+
+</xsl:stylesheet>
+';
+}
+
+/**
+ * Menu callback for returning a datastream from a resource.
+ *
+ * @return json
+ *  A JSON object with on field 'output' which contains an html repersentation of the datastream.
+ */
+function si_exhibition_get_datastream_as_json() {
+  $pid = $_GET['pid'];
+  $dsid = $_GET['dsid'];
+  // List of viewable data streams directly from the URL
+  $theme = array('TEXT' => 'si_exhibition_text_datastream', 'CSV' => 'si_exhibition_csv_datastream', 'METADATA' => 'si_exhibition_metadata', 'METADATA_XMLS' => 'si_exhibition_metadata_xmls');
+  $repo = tuque_wrapper_get_repository_instance();
+  $object = $repo->getObject($pid); // If listed in the resources we know we already have access to it.
+  $output = isset($theme[$dsid]) ? theme($theme[$dsid], array('object'=>$object)) : t('An Error Occured.');
+  /*
+  if ($dsid == 'METADATA_XMLS'){
+    header('Content-Type: text/xml');
+    print '<?xml version="1.0" encoding="UTF-8"?>
+<?xml-stylesheet type="text/xsl" href="xsl/metadata-display.xsl"?>
+';
+    print $output;
+  }else
+  */
+    print json_encode(array('output' => $output));
+  exit();
+}
+
+/**
+ * Menu callback, renders the OBJ.swf datastream of the given object.
+ *
+ * @return string
+ *  FlexPaper HTML page to be displayed in an iframe.
+ */
+function si_exhibition_flexpaper($pid) {
+  if ($pid == 'FlexPaperViewer.swf') {
+    drupal_goto('sites/all/libraries/flexpaper/FlexPaperViewer.swf');
+  }
+  print theme('si_exhibition_flexpaper', $pid);
+  exit;
+}
+
+/*
+function si_exhibition_theme_registry_alter(&$theme_registry) {
+  $theme_hook = 'page'; // my hook name
+  // Get the path to this module
+  $modulepath = drupal_get_path('module', 'si_exhibition');
+  // Add the module path on top in the array of paths
+  array_unshift($theme_registry[$theme_hook]['theme paths'], $modulepath);
+}
+*/
+
+function si_exhibition_update_js(&$variables) {
+  // Get scripts
+  $scripts = drupal_add_js();
+
+  // Unset jquery from core
+  unset($scripts['misc/jquery.js']);
+  unset($scripts['misc/jquery.once.js']);
+
+  // Put a new jquery into core
+  $modulepath = drupal_get_path('module', 'si_exhibition');
+  drupal_add_js($modulepath.'/js/jquery-1.11.0.min.js');
+  drupal_add_js($modulepath.'/js/jquery.browser.compat.js');
+  drupal_add_js($modulepath.'/js/jquery.once.min.js');
+  drupal_add_js($modulepath.'/js/jstree/dist/jstree.min.js');
+  drupal_add_js($modulepath.'/js/si_exhibition.js');
+}
+
+function si_exhibition_get_item_display_config($pid,$nav_to_pid){
+  //This is called a bunch of times, cache the info for the request at least
+  if (!empty($_REQUEST['store_pid_config_'.$pid])){
+    return $_REQUEST['store_pid_config_'.$pid];
+  }
+  $to_print = '';
+  $url_to_get =
+    variable_get('si_exhibition_data_url',
+    ''
+    )
+    .
+    urlencode($pid);
+  $ch = curl_init();
+  $timeout = 500;
+  curl_setopt($ch, CURLOPT_URL, $url_to_get);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+  $data = curl_exec($ch);
+  
+  //echo 'si_exhibition.module: line 1534<br><pre>' . print_r($data, true) . '</pre>';
+  
+  if ($data === FALSE){
+    $curl_error_string = curl_error($ch);
+    print 'Could not obtain data from:'.$url_to_get.'<br/>'."\n";
+    print $curl_error_string.'<br/>'."\n";
+    $info = curl_getinfo($ch);
+    print_r ($info);
+    curl_close($ch);
+    $se = array();
+    $se['error'] = $curl_error_string;
+    $_REQUEST['store_pid_config_'.$pid] = $se;
+    return $se;
+  }
+  curl_close($ch);
+  $my_json = $data;
+  $se = json_decode($my_json,true);
+
+  if (isset($se['nav_type']) && $se['nav_type'] == 'tree'){
+    $block = module_invoke('si_exhibition', 'block_view', 'seu_nav');
+    //See if the tree should start on the current node or if there is a path
+    $path = filter_input(INPUT_GET, 'path');
+    //if we have a path, make sure we can access that path
+    $tree = NULL;
+
+    $tree_pid_list = array();
+    if (empty($path)){
+      $tree = get_pid_tree(arg(2), null, $tree_pid_list);
+    }else{
+      $path_list = explode(',',$path);
+      if (!empty($path_list[0])){
+        $tree = get_pid_tree($path_list[0], null, $tree_pid_list);
+        if (!in_array(arg(2),$tree_pid_list)){
+          watchdog('exhibition','Bad tree structure');
+          drupal_not_found();
+          return null;
+        }
+      }
+    }
+    $curr_pos = $tree;
+    $to_print .= '<div id="forjstree" style="overflow:auto;"><ul>'.get_printable_tree($curr_pos).'</ul></div>';//['pid'];
+  } else {
+     $repo = tuque_wrapper_get_repository_instance();
+     $object = $repo->getObject($nav_to_pid);
+     $to_print = '<h2 class="title block-title">SI Navigation</h2>';
+     $to_print .= theme('si_exhibition_navigation', array('object'=>$object));
+  }
+  if ($se['nav_location'] == 'left') $se['seu_nav_first'] = $to_print;//$block['content'];
+  if ($se['nav_location'] == 'right') $se['seu_nav_last'] = $to_print; //$block['content'];
+  if ($se['nav_location'] == 'bleft') $se['seu_nav_first_bottom'] = $to_print;//$block['content'];
+  if ($se['nav_location'] == 'bright') $se['seu_nav_last_bottom'] = $to_print; //$block['content'];
+  $_REQUEST['store_pid_config_'.$pid] = $se;
+  return $se;
+}
+function get_printable_tree($tree_pos, $current_path = ''){
+  $label = $tree_pos['object']->label;
+  if (empty($label)){
+    print_r($tree_pos);
+  }
+  $output = '<li><a href="'.base_path().'fedora/repository/'.$tree_pos['pid'].'?path='.$current_path.'">'.$tree_pos['object']->label;
+  if (isset($tree_pos['already_in_tree']) && $tree_pos['already_in_tree']){
+    $output .= '*';
+  }
+  $output .='</a>';
+  if (!empty($tree_pos['children'])){
+    if ($current_path != '') $current_path .= ',';
+    $output .= '<ul>';
+    foreach ($tree_pos['children'] as $curr ){
+      $output .= get_printable_tree($curr, $current_path.$tree_pos['pid']);
+    }
+    $output .= '</ul>';
+  }
+  $output .= '</li>';
+  return $output;
+}
+
+function get_pid_tree($pid, $owner_id, &$pid_list = array()){
+  require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
+  $to_return = array();
+  $to_return['pid'] = $pid;
+  if (in_array($pid, $pid_list)){
+    //already did this, duplicate found:
+    //dsm('found this pid in the tree already:'.$pid);
+    $repo = tuque_wrapper_get_repository_instance();
+    $object = $repo->getObject($pid);
+    $to_return['object'] = $object;
+    $to_return['already_in_tree'] = TRUE;
+    return $to_return;
+  }
+  $repo = tuque_wrapper_get_repository_instance();
+  try{
+    $exist = si_exhibition_check_object_info_accessible(array('pid' => $pid));
+    if ($exist){
+      $object = $repo->getObject($pid);
+      $to_return['object'] = $object;
+      $to_return['children'] = array();
+      $pid_list[] = $pid;
+      //return $object->owner; //si_exhibition_get_child_concept_info($object);
+      $children = si_exhibition_get_child_concept_info($object);
+      //Get the children
+      foreach($children as $child){
+        //Build the tree from all the children
+        //for each child, get their sub-tree
+        $to_return['children'][] = get_pid_tree($child['pid'],$owner_id,$pid_list);
+      }
+      return $to_return;
+    }else{
+      dsm('doesnt exist:'.$pid);
+      return null;
+    }
+  }catch(Exception $hce){
+    dsm('exception trying to get:'.$pid);
+    return null;
+  }
+}
+function exhibition_resources_form($form, &$form_state){
+  $form['#method'] = 'get';
+  foreach($_GET as $param_name => $param_value){
+    if ($param_name != 'q' && $param_name != 'form_id' && $param_name != 'form_build_id' && $param_name != 'op' && $param_name != 'form_token'){
+      $form[$param_name] = array(
+        '#type' => 'hidden',
+        '#default_value' => $param_value,
+      );
+    }
+  }
+  $form['show'] = array(
+    '#type' => 'select',
+    '#title' => t('Limit by type'),
+    '#default_value' => (isset($_GET['show'])?$_GET['show']:''),//$form_state['show'],
+    '#options' => array(
+      'all' => t('All'),
+      'images' => t('Images'),
+      'pdf' => t('Digitized Text (pdf)'),
+      'csv' => t('Tabular Datasets'),
+    ),
+  );
+  $form['limit'] = array(
+    '#type' => 'select',
+    '#title' => t('Results per page'),
+    '#default_value' => (isset($_GET['limit'])?$_GET['limit']:''),
+    '#options' => array(
+      '10' => t('10'),
+      '15' => t('15'),
+      '20' => t('20'),
+      '25' => t('25'),
+      '30' => t('30'),
+    ),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Go'),
+  );
+  return $form;
+}
+
+function _si_exhibition_dump(&$var) {
+  if (SIDORA_EX_DUMP === TRUE) {
+    var_dump($var);
+  }
+}

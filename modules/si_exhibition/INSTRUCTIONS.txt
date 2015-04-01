@@ -1,0 +1,82 @@
+Smithsonian exhibition instructions 
+===================================
+
+- create a sub-site named 'fieldbooks' using the instructions here: http://support.discoverygarden.ca/projects/si/wiki/Subsite_Setup
+I started off with a fresh drupal install for my sub-site. A fresh drupal install would work fine as there is not too much to configure
+
+Download and place in /sites/ip-addresss.fieldbook/modules/ :
+- si_exhibition: https://github.com/discoverygarden/si_exhibition
+- shadowbox: http://drupal.org/project/shadowbox
+
+Download and place in /sites/all/libraries/
+- FlexPaper: Download the latest flash version:  http://flexpaper.devaldi.com/download/ 
+
+Update Sidora in /sites/all/modules/sidora with the latest 'Exhibition' branch located at https://github.com/DannyJoris/sidora/tree/exhibition
+This might need a merge as some commits aren't included yet: https://github.com/DannyJoris/sidora/network
+
+Pull the latest changes for the Smithsonian theme.
+
+Enable following modules:
+- all required islandora modules
+- sidora_settings (don't enable sidora)
+- si_exhibition (Smithsonian Exhibition Piece)
+- shadowbox
+- skinr
+
+
+
+Configuration (from fresh drupal install)
+
+- make sure the user (anonymous) has the right permissions to view the collection.
+
+- enable the Smithsonian theme at admin/build/themes/select and configure at admin/build/themes/settings/smithsonian
+[x] Logo
+[x] Site name
+[ ] Site slogan
+[x] Mission statement
+[ ] User pictures in posts
+[ ] User pictures in comments
+[ ] Search box
+[x] Shortcut icon
+[x] Primary links
+[x] Secondary links
+Important: under Theme-specific settings > Fusion theme settings > General settings > Layout
+- change 16 column fixed to 16 column fluid 
+- 100% width
+- Split sidebars
+- First sidebar: 3 grid units
+- Last sidebar: 4 grid units
+
+Configure Fedora settings at admin/settings/fedora_repository
+- root collection PID: si:fieldBookTop
+
+Menu settings: use the primary menu to add one home and one 'Repository' menu item. Link to fedora/repository
+
+Configure the si_exhibition module at admin/settings/si_exhibition:
+- select 'combined'
+This will expose the object navigation as a block.
+
+Go to the block settings at admin/build/block/list/smithsonian
+- Place the 'SI Navigation' block in the 'sidebar last' region.
+- Save and edit block settings.
+- You can optionally rename the title from 'SI Navigation' to 'Navigation'.
+- under 'Smithsonian styles' check 'white background'
+- no need to set page specific display settings. The block will only show up on an islandora object view.
+
+Make sure any other blocks in sidebar first or sidebar last won't show up on the object views by editing their display settings like this:
+[x] Show on every page except the listed pages.
+fedora*
+
+
+
+Extra:
+======
+In case the objects on the production server don't have any data attached to the resource objects there might be a need to add sample data:
+
+OBJ         = pdf (( application/pdf ))
+OBJ.swf  = .swf generated from .pdf  (( application/x-shockwave-flash ))
+IMAGE    = image jpeg (( image/jpeg ))
+TEXT       = .txt file  (( text/plain ))
+CSV         = .csv file  (( text/csv ))
+VIDEO     = not configured yet.
+
