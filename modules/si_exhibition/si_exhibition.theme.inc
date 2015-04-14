@@ -120,8 +120,8 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       'class' => 'resources-jpg'
     ),
     'si:datasetCModel' => array(
-      'dsid' => 'CSV',
-      'view' => 'CSV',
+      'dsid' => array('OBJ','CSV'),
+      'view' => array('OBJ','CSV'),
       'func' => 'si_exhibition_ds',
       'type' => array('r-csv', 'csv'), // Icon, Label
       'class' => 'resources-csv'
@@ -135,6 +135,12 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       'class' => 'resources-pdf'
     )
   );
+  /*
+  print '<div style="padding:20px;">';
+  var_dump(array_flip($resource['models']));
+  print '</div>';
+  var_dump(array_intersect_key($display_definitions, array_flip($resource['models'])));
+  */
   $display = array_pop(array_intersect_key($display_definitions, array_flip($resource['models']))); // Assuming an object can't be two types of resources.
   if (empty($display)) return; //BBB
   $display['url'] = (isset($display['url'])?$display['url']:'');
@@ -144,12 +150,20 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   $display_metadata_function = 'return si_exhibition_ds("' . $resource['pid'] . '", "METADATA_XMLS")';
   $metadata = "<a href='#' rel='shadowbox' title='{$resource['label']}' onclick='{$display_metadata_function}'>" . t('View Metadata') . '</a>';
   // View
+  //Serach through the types we care about to find a datastream that's available
+  //Originally set up as a single DSID, shoehorning in having datastream options
   $view = '';
+
+  $available_view = '';
+  if (is_array($display['view'])) foreach($display['view'] as $curr_view) if (array_search($curr_view, $resource['datastreams']) !== FALSE) $available_view = $curr_view;
+  if (!empty($available_view)){ $display['view'] = $available_view;  }
+
+  //print '<div>'; var_dump($display); print '</div>';  //BBB
   if (array_search($display['view'], $resource['datastreams']) !== FALSE) {
     $thumbnail_url = url("fedora/repository/{$resource['pid']}/TN");
     $view_preview = (isset($display['tn']) && array_search('TN', $resource['datastreams']) !== FALSE) ? "<img class='resource-tn' src='$thumbnail_url'/>" : '';
     if (isset($display['url'])) {
-      if (empty($view_preview)) $view_preview = t('View Metadata');
+      //if (empty($view_preview)) $view_preview = t('View Metadata');
       $view = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '">' . $view_preview . '</a>';
     }
     else {
@@ -165,6 +179,11 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   $type = "<div class='r-icon $icon title='$type'>$type</div>";
   // Download
   $download = '';
+
+  $available_dsid = '';
+  if (is_array($display['dsid'])) foreach($display['dsid'] as $curr_dsid) if (array_search($curr_dsid, $resource['datastreams']) !== FALSE) $available_dsid = $curr_dsid;
+  if (!empty($available_dsid)){ $display['dsid'] = $available_dsid;  }
+
   if (array_search($display['dsid'], $resource['datastreams']) !== FALSE) {
     $download = l('Download', 'fedora/repository/' . $resource['pid'] . '/' . $display['dsid'], array('class'=> $display['class']));
   }
@@ -172,13 +191,13 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   $option_dropdown .= '<div class="regular-options">'.$download.$metadata;
   $option_dropdown .= '<a href="#" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '" onclick="' . $display_datastream_function . '">Preview</a>';
   $option_dropdown .= '</div>';
-  $option_dropdown .= '<script>(function($){';
+  $option_dropdown .= "\n".'<script>(function($){';
   $jquery_item = '$("#exhibition_option_dd_'.substr($resource['pid'],3).'")';
   $option_dropdown .= $jquery_item.'.change(function(){';
-  $option_dropdown .= 'var val = '.$jquery_item.'.val();';
-  $option_dropdown .= 'if (val  == "meta"){';
+  $option_dropdown .= "\n".'var val = '.$jquery_item.'.val();';
+  $option_dropdown .= "\n".'if (val  == "meta"){';
   $option_dropdown .= $display_metadata_function;
-  $option_dropdown .= '}else if (val == "preview"){';
+  $option_dropdown .= "\n".'}else if (val == "preview"){';
   $option_dropdown .= "
  Shadowbox.open({
 content: '".url("fedora/repository/{$resource['pid']}/{$display['url']}")."',
@@ -276,18 +295,30 @@ function theme_si_exhibition_child_concepts($vars){
   );
   return $header . (empty($links) ? t('This item has no child concepts.') : theme('item_list', $item_list_array));
 }
-
+function si_exhibition_all_meta($object){
+  $datastream_content = '';
+  foreach($object as $dsid_loop=>$datastream_loop){
+    //strip off the <?xml directives if it has any and remove binary data
+    $content = $datastream_loop->content;
+    $doc = new DOMDocument();
+    if (substr(trim($content),0,1) == '<'){
+      $doc->loadXML($content);
+      $datastream_content .= $doc->saveHTML();
+    }
+  }
+  return $datastream_content;
+}
 function theme_si_exhibition_metadata_xmls($vars){
   $object = $vars['object'];
   $rows = si_models_get_display_xmls($object->id);
-  
+  /*
   $output = '<xml_root>';
   //$output .= '<debug>test</debug>';
   foreach($rows as $row){
     //if it has the <?xml directive, that needs to be taken out
     if (strpos($row[1], '<?xml') !== FALSE){
       //Assume it ends with the ? > characters
-      $toCheckLines = explode('?>',$row[1]);
+      $toCheckLines = explode('?'.'>',$row[1]);
       $outputLine = '';
       foreach($toCheckLines as $checkLine){
         if (strpos($checkLine, '<?xml') === FALSE){
@@ -300,31 +331,37 @@ function theme_si_exhibition_metadata_xmls($vars){
     }
   }
   $output .= '</xml_root>';
+  */
+  $datastream_content =  si_exhibition_all_meta($object);
+  $datastream_content = '<xml_root><general_info><owner>'.$object->owner.'</owner><label>'.$object->label.'</label></general_info>'."\n".$datastream_content."\n".'</xml_root>';
+  $output = $datastream_content;
   $doc = new DOMDocument();
   $xsl = new XSLTProcessor();
   
   $doc->loadXML(si_exhibition_xsl_string());
   $xsl->importStyleSheet($doc);
-  $docToLoad = ('<?xml version="1.0" encoding="UTF-8"?>'.$output);
+  $docToLoad = ('<?xml version="1.0" encoding="UTF-8"?'.'>'.$output);
   $doc->loadXML($docToLoad);
+  if (!empty($_GET['output'])){
+	  if ($_GET['output'] == 'xslSaved'){
+	    print $doc->saveXML();
+	    exit();
+	  }
+	  if ($_GET['output'] == 'xml'){
+	    print $docToLoad;
+	    exit();
+	  }
+	  
+	  if ($_GET['output'] == 'phpTransform'){
+	    print $xsl->transformToXML($doc);
+	    exit();
+	  }
+	  if ($_GET['output'] == 'xsl'){
+	    print si_exhibition_xsl_string();
+	    exit();
+          }
+  }
   /*
-  if ($_GET['output'] == 'xslSaved'){
-    print $doc->saveXML();
-    exit();
-  }
-  if ($_GET['output'] == 'xml'){
-    print $docToLoad;
-    exit();
-  }
-  
-  if ($_GET['output'] == 'phpTransform'){
-    print $xsl->transformToXML($doc);
-    exit();
-  }
-  if ($_GET['output'] == 'xsl'){
-    print si_exhibition_xsl_string();
-    exit();
-  }
   */
   $initialOutput = $xsl->transformToXML($doc);
   //now go through and add the even/odd classes

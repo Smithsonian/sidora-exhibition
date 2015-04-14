@@ -400,7 +400,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     watchdog('exhibition', '_si_show_exhibition for:'.$pid.' was false');
     return drupal_not_found();
   }
-  if ($dsid != NULL) {
+  if ($dsid != NULL && !empty($object) && !empty($object[$dsid])) {
     //Moved this section down from the top 1/27/2015 BBB
     //Here we know we "should" be able to see it
     header("Content-Type: ".$object[$dsid]->mimetype);
@@ -408,8 +408,14 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     exit();
     //return call_user_func_array('repository_page', func_get_args()); // Use the default datastream download code.
   }
-  return theme('si_exhibition_object', array('object'=>$object));
-  exit;
+  if (!empty($object)){
+    return theme('si_exhibition_object', array('object'=>$object));
+    exit();
+  }else{
+    print "not found";
+    exit();
+  }
+  
 }
 
 function si_exhibition_check_view_permission($object_pid) {
@@ -425,7 +431,7 @@ function si_exhibition_check_view_permission($object_pid) {
   if($object_pid == 'undefined' || !$object_pid) {
     $object_pid = variable_get('fedora_repository_pid', 'islandora:top');
   }
-
+ return true; //BBB remove the xacml code??
   $object = new Fedora_Item($object_pid);
   if(!$object->exists()) {
     return false;
@@ -1551,7 +1557,10 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
   curl_close($ch);
   $my_json = $data;
   $se = json_decode($my_json,true);
-
+  if ($se['error'] === TRUE){
+    drupal_set_message(t('This item is unavailable for view. You may attempt downloading.'), 'error', FALSE);
+    return;
+  }
   if (isset($se['nav_type']) && $se['nav_type'] == 'tree'){
     $block = module_invoke('si_exhibition', 'block_view', 'seu_nav');
     //See if the tree should start on the current node or if there is a path

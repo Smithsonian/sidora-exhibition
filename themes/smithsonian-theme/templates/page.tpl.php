@@ -62,18 +62,21 @@ if (!empty($extra_css)){
             <?php echo render($variables['page']['header']); ?>
             
             <?php
-            if($variables['primary_links_tree'] != '' && $variables['sidora_exhibition']['links']) {
-              $variables['primary_links_tree'] = str_replace(' last leaf"><a','"><a',$variables['primary_links_tree']);
-              $toInsert = '';
+            if(!empty($variables['sidora_exhibition']['links'])){
+              if($variables['primary_links_tree'] != '' && $variables['sidora_exhibition']['links']) {
+                $variables['primary_links_tree'] = str_replace(' last leaf"><a','"><a',$variables['primary_links_tree']);
+                $toInsert = '';
             
-              foreach($variables['sidora_exhibition']['links'] as $exhibition_link){
-                $toInsert .= '<li class="leaf"><a href="'.$exhibition_link['link'].'">'.$exhibition_link['name'].'</a></li>';
+                foreach($variables['sidora_exhibition']['links'] as $exhibition_link){
+                  $toInsert .= '<li class="leaf"><a href="'.$exhibition_link['link'].'">'.$exhibition_link['name'].'</a></li>';
+                }
+                $variables['primary_links_tree'] = str_replace('</ul>',$toInsert.'</ul>',$variables['primary_links_tree']);
               }
-              $variables['primary_links_tree'] = str_replace('</ul>',$toInsert.'</ul>',$variables['primary_links_tree']);
             }
             ?>
             
-            <?php print theme('grid_block', array('content' => $variables['primary_links_tree'], 'id' => 'primary-menu')); ?>
+            <?php 
+              if (!empty($variables['primary_links_tree'])) print theme('grid_block', array('content' => $variables['primary_links_tree'], 'id' => 'primary-menu')); ?>
             <?php print theme('grid_block', array('content' => $breadcrumb, 'id' => 'breadcrumbs')); ?>
 
           </div><!-- /header-group-inner -->
