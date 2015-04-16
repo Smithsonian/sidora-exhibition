@@ -291,7 +291,7 @@ function _si_show_exhibition(){
     if (!empty($path)){
       $path_list = explode(',',$path);
       if (!empty($path_list[0])){
-        $tree = get_pid_tree($path_list[0], null, $tree_pid_list);
+        $tree = _si_exhibition_get_pid_tree($path_list[0], null, $tree_pid_list);
         if (!in_array(arg(2),$tree_pid_list)){
           $bad_path = true;
         }
@@ -475,15 +475,23 @@ function si_exhibition_custom_url($cu) {
   $my_pid = file_get_contents( $url  );
   drupal_goto('fedora/repository/'.$my_pid);
 }
-
+/*
+ * Returns the xsl we are using directly to the browser
+ */
 function si_exhibition_xsl(){
   header('Content-Type: text/xml');
   print si_exhibition_xsl_string();
   exit();
 }
+/*
+ * Get the xsl string to transform the metadata
+ */
 function si_exhibition_xsl_string(){
   return variable_get('si_exhibition_metadata_xsl',si_exhibition_xsl_string_default());
 }
+/*
+ * Return a hard-coded built in xsl string (for first install mostly)
+ */
 function si_exhibition_xsl_string_default(){
   return '<?xml version="1.0" encoding="UTF-8"?>
 
@@ -1519,7 +1527,11 @@ function si_exhibition_update_js(&$variables) {
   drupal_add_js($modulepath.'/js/jstree/dist/jstree.min.js');
   drupal_add_js($modulepath.'/js/si_exhibition.js');
 }
-
+/*
+ * Return the display configuration object
+ * If it's not already stored for this call, go get it from the exhibition_config server
+ * Will return NULL on errors and may set drupal error messages during the error processing
+ */
 function si_exhibition_get_item_display_config($pid,$nav_to_pid){
   //This is called a bunch of times, cache the info for the request at least
   if (!empty($_REQUEST['store_pid_config_'.$pid])){
@@ -1570,11 +1582,11 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
 
     $tree_pid_list = array();
     if (empty($path)){
-      $tree = get_pid_tree(arg(2), null, $tree_pid_list);
+      $tree = _si_exhibition_get_pid_tree(arg(2), null, $tree_pid_list);
     }else{
       $path_list = explode(',',$path);
       if (!empty($path_list[0])){
-        $tree = get_pid_tree($path_list[0], null, $tree_pid_list);
+        $tree = _si_exhibition_get_pid_tree($path_list[0], null, $tree_pid_list);
         if (!in_array(arg(2),$tree_pid_list)){
           watchdog('exhibition','Bad tree structure');
           drupal_not_found();
@@ -1583,7 +1595,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
       }
     }
     $curr_pos = $tree;
-    $to_print .= '<div id="forjstree" style="overflow:auto;"><ul>'.get_printable_tree($curr_pos).'</ul></div>';//['pid'];
+    $to_print .= '<div id="forjstree" style="overflow:auto;"><ul>'.si_exhibition_get_printable_tree($curr_pos).'</ul></div>';//['pid'];
   } else {
      $repo = tuque_wrapper_get_repository_instance();
      $object = $repo->getObject($nav_to_pid);
@@ -1597,7 +1609,10 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
   $_REQUEST['store_pid_config_'.$pid] = $se;
   return $se;
 }
-function get_printable_tree($tree_pos, $current_path = ''){
+/*
+ * Returns a SIdora tree in html format
+ */
+function si_exhibition_get_printable_tree($tree_pos, $current_path = ''){
   $label = $tree_pos['object']->label;
   if (empty($label)){
     print_r($tree_pos);
@@ -1611,15 +1626,17 @@ function get_printable_tree($tree_pos, $current_path = ''){
     if ($current_path != '') $current_path .= ',';
     $output .= '<ul>';
     foreach ($tree_pos['children'] as $curr ){
-      $output .= get_printable_tree($curr, $current_path.$tree_pos['pid']);
+      $output .= si_exhibition_get_printable_tree($curr, $current_path.$tree_pos['pid']);
     }
     $output .= '</ul>';
   }
   $output .= '</li>';
   return $output;
 }
-
-function get_pid_tree($pid, $owner_id, &$pid_list = array()){
+/*
+ * return the php object representing the fedora tree
+ */
+function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array()){
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $to_return = array();
   $to_return['pid'] = $pid;
@@ -1646,7 +1663,7 @@ function get_pid_tree($pid, $owner_id, &$pid_list = array()){
       foreach($children as $child){
         //Build the tree from all the children
         //for each child, get their sub-tree
-        $to_return['children'][] = get_pid_tree($child['pid'],$owner_id,$pid_list);
+        $to_return['children'][] = _si_exibition_get_pid_tree($child['pid'],$owner_id,$pid_list);
       }
       return $to_return;
     }else{
@@ -1658,6 +1675,9 @@ function get_pid_tree($pid, $owner_id, &$pid_list = array()){
     return null;
   }
 }
+/*
+ * Return the form that will change the table presented in the middle of the exhibition screen in the browser
+ */
 function exhibition_resources_form($form, &$form_state){
   $form['#method'] = 'get';
   foreach($_GET as $param_name => $param_value){
