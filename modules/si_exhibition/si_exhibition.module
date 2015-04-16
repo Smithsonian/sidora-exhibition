@@ -281,6 +281,9 @@ function si_exhibition_block_view($delta='') {
   }
 }
 
+/*
+ * Return if this exhibition should be shown
+ */
 function _si_show_exhibition(){
     global $bad_path_set;
     global $bad_path;
@@ -417,7 +420,10 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
   }
   
 }
-
+/*
+ * Intended to determine if this should be viewable, but right now 
+ * just checks to see if the pid is valid
+ */
 function si_exhibition_check_view_permission($object_pid) {
   $xacml_dsid = 'POLICY';
 
@@ -1510,7 +1516,9 @@ function si_exhibition_theme_registry_alter(&$theme_registry) {
   array_unshift($theme_registry[$theme_hook]['theme paths'], $modulepath);
 }
 */
-
+/*
+ * Set the javascript that is necessary for the exhibition, unsetting existing jQuerys
+ */
 function si_exhibition_update_js(&$variables) {
   // Get scripts
   $scripts = drupal_add_js();
