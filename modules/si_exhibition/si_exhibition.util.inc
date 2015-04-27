@@ -215,7 +215,10 @@ function si_exhibition_cron_cache($function_name = FALSE, $arguments = FALSE){
  *    pid, label, datastreams
  */
 function si_exhibition_get_child_resource_info(FedoraObject $object, $type = 'all', $sort = 'asc', $limit = NULL, $offset = NULL) {
-  $cache_data_index = $object->id.$type.$sort.$limit.$offset;
+  return si_exhibition_get_child_resource_info_by_id($object->id, $type, $sort, $limit, $offset);
+}
+function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', $sort = 'asc', $limit = NULL, $offset = NULL) {
+  $cache_data_index = $object_id.$type.$sort.$limit.$offset;
   $cache_name = 'get_child_resource_info';
   $to_return = si_exhibition_cache($cache_name, $cache_data_index);
   if (!empty($to_return)){ return $to_return; }
@@ -232,7 +235,7 @@ function si_exhibition_get_child_resource_info(FedoraObject $object, $type = 'al
   $resource_types = isset($resource_types[$type]) ? $resource_types[$type] : FALSE;
   if ($resource_types !== FALSE) {
     $repo = tuque_wrapper_get_repository_instance();
-    $query = si_exhibition_generate_child_resource_query($object->id, $resource_types, $sort, $limit, $offset);
+    $query = si_exhibition_generate_child_resource_query($object_id, $resource_types, $sort, $limit, $offset);
     $results = $repo->ri->itqlQuery($query);
     $resources = array_map(function($o) { return array('pid' => $o['o']['value'], 'label' => $o['t']['value']); }, $results);
     // @todo replace the checks for each objects existance once we have the appropriate information in the rels to determine if its accessible.
@@ -255,6 +258,7 @@ function si_exhibition_get_child_resource_info(FedoraObject $object, $type = 'al
       }
     }
   }
+  si_exhibition_cron_cache(__FUNCTION__, func_get_args());
   si_exhibition_cache($cache_name, $cache_data_index, $resources);
 
   return $resources;
