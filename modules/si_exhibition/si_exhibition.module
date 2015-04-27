@@ -1647,11 +1647,6 @@ function si_exhibition_get_printable_tree($tree_pos, $current_path = ''){
  */
 function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array()){
   $orig_args = func_get_args();
-  /*
-  print '<hr>';
-  var_dump($orig_args);
-  print '<hr>';
-  */
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $cache_name = 'get_pid_tree';
   $cache_index = $pid.'_'.$owner_id.'_'.implode('+',$pid_list);
@@ -1691,12 +1686,6 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array()){
         //for each child, get their sub-tree
         $to_return['children'][] = _si_exhibition_get_pid_tree($child['pid'],$owner_id,$pid_list);
       }
-      /*
-      dsm("setting from determination $cache_name $cache_index $to_return");
-  print '<hr>2:';
-  var_dump($orig_args);
-  print '<hr>';
-      */
       si_exhibition_cron_cache(__FUNCTION__, func_get_args());
       si_exhibition_cache($cache_name, $cache_index_list, $pid_list);
       si_exhibition_cache($cache_name, $cache_index, $to_return);
@@ -1717,26 +1706,7 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array()){
 function si_exhibition_cron(){
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $cron_check = si_exhibition_cron_cache(); 
-  /*
-  ob_start();
-  var_dump($cron_check);
-  $to_print = ob_get_clean();
-  drupal_set_message( $to_print );
-  $cache_name = 'get_pid_tree';
-  $tree_cache = si_exhibition_cache($cache_name, '');
-  ob_start();
-  var_dump($tree_cache);
-  $to_print = ob_get_clean();
-  drupal_set_message( $to_print );
-  */
   cache_clear_all('si_exhibition_cache_', 'cache', TRUE);  //Clear the main cache
-  /*
-  $tree_cache = si_exhibition_cache($cache_name, '');
-  ob_start();
-  var_dump($tree_cache);
-  $to_print = ob_get_clean();
-  drupal_set_message( $to_print );
-  */
   if (empty($cron_check)){
     return;
   }
@@ -1745,7 +1715,6 @@ function si_exhibition_cron(){
     foreach($fn_args_arrays as $fn_args){
       //if it's _si_exhibition_get_pid_tree only make the calls where the array is blank, as the others are unnecessary and we worry about pass by ref
       if ($fn_name == '_si_exhibition_get_pid_tree'){
-        var_dump($fn_args[2]);
         $pid_list = array();
         _si_exhibition_get_pid_tree($fn_args[0],$fn_args[1],$pid_list);
       }else{
@@ -1753,13 +1722,6 @@ function si_exhibition_cron(){
       }
     }
   }
-  /*
-  $tree_cache = si_exhibition_cache($cache_name, '');
-  ob_start();
-  var_dump($tree_cache);
-  $to_print = ob_get_clean();
-  drupal_set_message( $to_print );
-  */
 }
 /*
  * Return the form that will change the table presented in the middle of the exhibition screen in the browser
