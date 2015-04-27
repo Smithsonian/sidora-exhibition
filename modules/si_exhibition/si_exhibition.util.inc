@@ -31,7 +31,7 @@ function si_exhibition_check_object_info_accessible(array $object_info) {
 */
 function si_exhibition_check_parent_in_tree(array $object_info, $tree_pid) {
   $tree_pid_list = array();
-  $tree = get_pid_tree($tree_pid, null, $tree_pid_list);
+  $tree = _si_exhibition_get_pid_tree($tree_pid, null, $tree_pid_list);
   return in_array($object_info['pid'], $tree_pid_list);
 }
 
@@ -138,6 +138,64 @@ function si_exhibition_generate_child_concept_query($pid) {
      <info:fedora/' . $pid . '> <fedora-rels-ext:hasConcept> $o
      order by $t';
 }
+/*
+ * Returns the data from the cache if called with a cache_name and a cache_id
+ * Returns the entire cached array if called with a cache_name, empty string and no third param
+ * Saves data in the cache if second parameter has a value
+ * If permanent set to true, will not expire
+ */
+function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE, $permanent = FALSE){
+  $prefix = 'si_exhibition_cache_';
+  $cache_table_for_clearing = 'cache';
+  if ($overwrite === FALSE){
+    $cache = NULL;
+    if ($cache_info = cache_get($prefix.$cache_name, $cache_table_for_clearing)){
+      $cache = $cache_info->data;
+      if ($cache_data_index == ''){
+        //return the entire cache
+        return $cache;
+      }
+      if (array_key_exists($cache_data_index, $cache)){
+        return $cache[$cache_data_index];
+      }
+    }
+  }else{
+    $data = array();
+    if ($cache_info = cache_get($prefix.$cache_name, $cache_table_for_clearing)){
+      $data = $cache_info->data;
+    }
+    $data[$cache_data_index] = $overwrite;
+    $hours = 3;
+    $expire_date_time = time() + 60 * 60 * $hours;
+    if ($permanent === TRUE){
+      $expire_date_time = CACHE_PERMANENT;
+    }
+    cache_set($prefix.$cache_name, $data, $cache_table_for_clearing, $expire_date_time);
+  }
+  return NULL;
+}
+/*
+* Manipulate or get information from the cron_cache
+*
+* If no arguments are supplied, return the entire cron_cache
+*
+* If a function name is supplied, return the array of arrays of arguments for the function
+*
+* If function name and arguments are supplied,
+* Put information into the cache that cron will use to update the other cached data
+*/
+
+function si_exhibition_cron_cache($function_name = FALSE, $arguments = FALSE){
+  $current_cron_cache = si_exhibition_cache('cron_check','', FALSE, TRUE);
+  if ($current_cron_cache == NULL) $current_cron_cache = array();
+  if ($function_name === FALSE) return $current_cron_cache;
+  if (!array_key_exists($function_name, $current_cron_cache) || !is_array($current_cron_cache[$function_name])){
+    $current_cron_cache[$function_name] = array(); 
+  }
+  if ($arguments === FALSE) return $current_cron_cache[$function_name];
+  $current_cron_cache[$function_name][] = $arguments;
+  si_exhibition_cache('cron_check',$function_name, $current_cron_cache[$function_name], TRUE);
+}
 /**
  * Fetchs some information about the given object's child resources.
  *
@@ -157,6 +215,11 @@ function si_exhibition_generate_child_concept_query($pid) {
  *    pid, label, datastreams
  */
 function si_exhibition_get_child_resource_info(FedoraObject $object, $type = 'all', $sort = 'asc', $limit = NULL, $offset = NULL) {
+  $cache_data_index = $object->id.$type.$sort.$limit.$offset;
+  $cache_name = 'get_child_resource_info';
+  $to_return = si_exhibition_cache($cache_name, $cache_data_index);
+  if (!empty($to_return)){ return $to_return; }
+
   $resource_types = array(
     'all' => array(),
     'images' => array('si:imageCModel', 'si:generalImageCModel'),
@@ -165,6 +228,7 @@ function si_exhibition_get_child_resource_info(FedoraObject $object, $type = 'al
     'text' => FALSE,
     'video' => FALSE
   );
+  $resources = array();
   $resource_types = isset($resource_types[$type]) ? $resource_types[$type] : FALSE;
   if ($resource_types !== FALSE) {
     $repo = tuque_wrapper_get_repository_instance();
@@ -190,9 +254,10 @@ function si_exhibition_get_child_resource_info(FedoraObject $object, $type = 'al
         }
       }
     }
-    return $resources;
   }
-  return array();
+  si_exhibition_cache($cache_name, $cache_data_index, $resources);
+
+  return $resources;
 }
 
 /**
