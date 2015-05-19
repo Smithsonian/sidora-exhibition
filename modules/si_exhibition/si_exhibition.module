@@ -468,7 +468,61 @@ function si_exhibition_check_view_permission($object_pid) {
   }
   return false;
 }
+function si_exhibition_meta_string_for_xslt($object){
+  $pid = $object->id;
+  $xsl_config = '';
+  if (!empty($pid)){
+    $url_to_get =
+      variable_get('si_exhibition_workbench_xsl', '')
+      .
+      urlencode($pid);
+    $ch = curl_init();
+    $timeout = 500;
+    curl_setopt($ch, CURLOPT_URL, $url_to_get);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+    $data = curl_exec($ch);
 
+    //echo 'si_exhibition.module: line 1534<br><pre>' . print_r($data, true) . '</pre>';
+
+    if ($data === FALSE){
+      $curl_error_string = curl_error($ch);
+      print 'Could not obtain data from:'.$url_to_get.'<br/>'."\n";
+      print $curl_error_string.'<br/>'."\n";
+      $info = curl_getinfo($ch);
+      print_r ($info);
+      curl_close($ch);
+      $se = array();
+      $se['error'] = $curl_error_string;
+      $_REQUEST['store_pid_config_'.$pid] = $se;
+      return $se;
+    }
+    curl_close($ch);
+    $xsl_config = json_decode($data);
+
+  }
+  $specific_meta = '';
+  if (!empty($xsl_config)){
+    $specific_meta = $xsl_config->dsid;
+  }
+  $datastream_content = '';
+  if (empty($specific_meta)){
+    foreach($object as $dsid_loop=>$datastream_loop){
+      //strip off the <?xml directives if it has any and remove binary data
+      $content = $datastream_loop->content;
+      $doc = new DOMDocument();
+      if (substr(trim($content),0,1) == '<'){
+        $doc->loadXML($content);
+        $datastream_content .= $doc->saveHTML();
+      }
+    }
+    $datastream_content = '<xml_root><general_info><owner>'.$object->owner.'</owner><label>'.$object->label.'</label></general_info>'."\n".$datastream_content."\n".'</xml_root>';
+  }else{
+    $datastream_content = $object[$specific_meta]->content;
+  }
+  return $datastream_content;
+}
 /**
  * Menu callback for redirecting to a specific page.
  *
@@ -492,8 +546,44 @@ function si_exhibition_xsl(){
 /*
  * Get the xsl string to transform the metadata
  */
-function si_exhibition_xsl_string(){
-  return variable_get('si_exhibition_metadata_xsl',si_exhibition_xsl_string_default());
+function si_exhibition_xsl_string($pid){
+  $my_xsl = '';
+  if (!empty($pid)){
+    $url_to_get =
+      variable_get('si_exhibition_workbench_xsl', '')
+      .
+      urlencode($pid);
+    $ch = curl_init();
+    $timeout = 500;
+    curl_setopt($ch, CURLOPT_URL, $url_to_get);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+    $data = curl_exec($ch);
+
+    //echo 'si_exhibition.module: line 1534<br><pre>' . print_r($data, true) . '</pre>';
+
+    if ($data === FALSE){
+      $curl_error_string = curl_error($ch);
+      print 'Could not obtain data from:'.$url_to_get.'<br/>'."\n";
+      print $curl_error_string.'<br/>'."\n";
+      $info = curl_getinfo($ch);
+      print_r ($info);
+      curl_close($ch);
+      $se = array();
+      $se['error'] = $curl_error_string;
+      $_REQUEST['store_pid_config_'.$pid] = $se;
+      return $se;
+    }
+    curl_close($ch);
+    $my_xsl = $data;
+
+  }
+  if (empty($my_xsl)){ 
+    return variable_get('si_exhibition_metadata_xsl',si_exhibition_xsl_string_default());
+  }else{
+    return $my_xsl;
+  }
 }
 /*
  * Return a hard-coded built in xsl string (for first install mostly)

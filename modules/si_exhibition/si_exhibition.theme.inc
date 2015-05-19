@@ -295,50 +295,19 @@ function theme_si_exhibition_child_concepts($vars){
   );
   return $header . (empty($links) ? t('This item has no child concepts.') : theme('item_list', $item_list_array));
 }
-function si_exhibition_all_meta($object){
-  $datastream_content = '';
-  foreach($object as $dsid_loop=>$datastream_loop){
-    //strip off the <?xml directives if it has any and remove binary data
-    $content = $datastream_loop->content;
-    $doc = new DOMDocument();
-    if (substr(trim($content),0,1) == '<'){
-      $doc->loadXML($content);
-      $datastream_content .= $doc->saveHTML();
-    }
-  }
-  return $datastream_content;
-}
+/*
+ * Returns the xml transformed by xsl, determined by the workbench if available, and the default xsl if not
+ *
+ */
 function theme_si_exhibition_metadata_xmls($vars){
   $object = $vars['object'];
   $rows = si_models_get_display_xmls($object->id);
-  /*
-  $output = '<xml_root>';
-  //$output .= '<debug>test</debug>';
-  foreach($rows as $row){
-    //if it has the <?xml directive, that needs to be taken out
-    if (strpos($row[1], '<?xml') !== FALSE){
-      //Assume it ends with the ? > characters
-      $toCheckLines = explode('?'.'>',$row[1]);
-      $outputLine = '';
-      foreach($toCheckLines as $checkLine){
-        if (strpos($checkLine, '<?xml') === FALSE){
-          $outputLine .= $checkLine;
-        }
-      }
-      $output .= $outputLine;
-    }else{
-      $output .= $row[1];
-    }
-  }
-  $output .= '</xml_root>';
-  */
-  $datastream_content =  si_exhibition_all_meta($object);
-  $datastream_content = '<xml_root><general_info><owner>'.$object->owner.'</owner><label>'.$object->label.'</label></general_info>'."\n".$datastream_content."\n".'</xml_root>';
+  $datastream_content =  si_exhibition_meta_string_for_xslt($object);
   $output = $datastream_content;
   $doc = new DOMDocument();
   $xsl = new XSLTProcessor();
   
-  $doc->loadXML(si_exhibition_xsl_string());
+  $doc->loadXML(si_exhibition_xsl_string($object->id));
   $xsl->importStyleSheet($doc);
   $docToLoad = ('<?xml version="1.0" encoding="UTF-8"?'.'>'.$output);
   $doc->loadXML($docToLoad);
@@ -361,8 +330,6 @@ function theme_si_exhibition_metadata_xmls($vars){
 	    exit();
           }
   }
-  /*
-  */
   $initialOutput = $xsl->transformToXML($doc);
   //now go through and add the even/odd classes
   $tableRows = explode("<tr>",$initialOutput);

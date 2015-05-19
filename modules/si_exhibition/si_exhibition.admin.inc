@@ -35,6 +35,14 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#type' => 'textfield',
       '#title' => t('Where to obtain the website configuration for the page (not where to obtain the Fedora data itself)'),
       '#default_value' => variable_get('si_exhibition_data_url', ''),
+      '#size' => 100,
+      '#description' => t('The Fedora Commons pid will be directly appended to the above, end with / if needed.'),
+    ),
+    'si_exhibition_workbench_xsl' => array(
+      '#type' => 'textfield',
+      '#title' => t('Where to obtain the XSL information from the workbench settings'),
+      '#default_value' => variable_get('si_exhibition_workbench_xsl', ''),
+      '#size' => 100,
       '#description' => t('The Fedora Commons pid will be directly appended to the above, end with / if needed.'),
     ),
     'si_exhibition_metadata_xsl' => array(
