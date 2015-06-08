@@ -139,12 +139,36 @@ function si_exhibition_generate_child_concept_query($pid) {
      order by $t';
 }
 /*
+ * Enable verbose levels of debugging
+ */
+function si_exhibition_debug($message, $object = NULL){
+  if (variable_get('si_exhibition_debug',FALSE)){
+    drupal_set_message($message);
+    if (!empty($object)){
+      ob_start();
+      print '<div id="" style="overflow-y: scroll; max-height:400px;">';
+      print '<pre>';
+      var_dump ($object);
+      print '</pre>';
+      print '</div>';
+      $content = ob_get_clean();
+      drupal_set_message($content);
+    }
+  }
+}
+
+/*
  * Returns the data from the cache if called with a cache_name and a cache_id
  * Returns the entire cached array if called with a cache_name, empty string and no third param
  * Saves data in the cache if second parameter has a value
  * If permanent set to true, will not expire
  */
 function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE, $permanent = FALSE){
+  si_exhibition_debug("si_exhibition_cache $cache_name | $cache_data_index | $overwrite | $permanent |");
+  if (!variable_get('si_exhibition_cache_on',TRUE)){
+    si_exhibition_debug("si_exhibition_cache is turned off");
+    return NULL; //If caching is turned off, don't use caching!
+  }
   $prefix = 'si_exhibition_cache_';
   $cache_table_for_clearing = 'cache';
   if ($overwrite === FALSE){
@@ -152,10 +176,12 @@ function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE,
     if ($cache_info = cache_get($prefix.$cache_name, $cache_table_for_clearing)){
       $cache = $cache_info->data;
       if ($cache_data_index == ''){
+        si_exhibition_debug("si_exhibition_cache returning entire cache", $cache);
         //return the entire cache
         return $cache;
       }
       if (array_key_exists($cache_data_index, $cache)){
+        si_exhibition_debug("si_exhibition_cache returning specific cache", $cache[$cache_data_index]);
         return $cache[$cache_data_index];
       }
     }
@@ -170,8 +196,11 @@ function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE,
     if ($permanent === TRUE){
       $expire_date_time = CACHE_PERMANENT;
     }
+    si_exhibition_debug("si_exhibition_cache setting cache $prefix | $cache_name", $data);
     cache_set($prefix.$cache_name, $data, $cache_table_for_clearing, $expire_date_time);
+    return NULL;
   }
+  si_exhibition_debug("si_exhibition_cache returning nothing found in cache");
   return NULL;
 }
 /*

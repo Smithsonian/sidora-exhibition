@@ -306,7 +306,11 @@ function theme_si_exhibition_metadata_xmls($vars){
   $output = $datastream_content;
   $doc = new DOMDocument();
   $xsl = new XSLTProcessor();
-  
+  $xsl_string = si_exhibition_xsl_string($object->id);
+  if ($xsl_string === FALSE){
+    //No XSL string (bad news)
+    exit();
+  }
   $doc->loadXML(si_exhibition_xsl_string($object->id));
   $xsl->importStyleSheet($doc);
   $docToLoad = ('<?xml version="1.0" encoding="UTF-8"?'.'>'.$output);
@@ -328,7 +332,7 @@ function theme_si_exhibition_metadata_xmls($vars){
 	  if ($_GET['output'] == 'xsl'){
 	    print si_exhibition_xsl_string();
 	    exit();
-          }
+    }
   }
   $initialOutput = $xsl->transformToXML($doc);
   //now go through and add the even/odd classes

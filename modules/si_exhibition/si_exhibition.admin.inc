@@ -56,12 +56,22 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#title' => t('Only allow items to appear in exhibitions that have full anonymous read access.'),
       '#default_value' => variable_get('si_exhibition_anonymous_only',FALSE),
     ),
+    'si_exhibition_cache_on' => array(
+      '#type' => 'checkbox',
+      '#title' => t('Cache items for speed improvements.'),
+      '#default_value' => variable_get('si_exhibition_cache_on',TRUE),
+    ),
+    'si_exhibition_debug' => array(
+      '#type' => 'checkbox',
+      '#title' => t('Turn on debugging mode.'),
+      '#default_value' => variable_get('si_exhibition_debug',FALSE),
+    ),
     'fedora_base_url' => array(
       '#type' => 'textfield',
       '#title' => t('Where to obtain the Fedora Commons objects'),
       '#default_value' => variable_get('fedora_base_url', 'http://localhost:8080/fedora'),
       '#description' => t('The Fedora Commons Repo location'),
-    )
+    ),
   );
   return system_settings_form($form);
 }

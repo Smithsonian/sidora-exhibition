@@ -334,8 +334,8 @@ function si_exhibition_preprocess_page(&$variables) {
       //logo is the image
       //site_slogan is under the name
       //site_name is the main name
-      $variables['logo'] = $se['logo'];
-      $variables['site_name'] = $se['title'];
+      if (array_key_exists('logo', $se)) $variables['logo'] = $se['logo']; else $variables['logo'] = '';
+      if (array_key_exists('title', $se)) $variables['site_name'] = $se['title']; else $variables['site_name'] = '';
       //$variables['site_slogan'] = ' sitey slogany'.arg(2);
       $variables['sidora_exhibition'] = $se;
       $variables['primary_links_tree'] = drupal_render(menu_tree_output(menu_tree_all_data('main-menu')));
@@ -474,7 +474,7 @@ function si_exhibition_meta_string_for_xslt($object){
   if (!empty($pid)){
     $url_to_get =
       variable_get('si_exhibition_workbench_xsl', '')
-      .
+      . 'xsl_config/' .
       urlencode($pid);
     $ch = curl_init();
     $timeout = 500;
@@ -551,7 +551,7 @@ function si_exhibition_xsl_string($pid){
   if (!empty($pid)){
     $url_to_get =
       variable_get('si_exhibition_workbench_xsl', '')
-      .
+      . 'xsl/' .
       urlencode($pid);
     $ch = curl_init();
     $timeout = 500;
@@ -573,7 +573,7 @@ function si_exhibition_xsl_string($pid){
       $se = array();
       $se['error'] = $curl_error_string;
       $_REQUEST['store_pid_config_'.$pid] = $se;
-      return $se;
+      return FALSE;
     }
     curl_close($ch);
     $my_xsl = $data;
