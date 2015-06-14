@@ -16,7 +16,10 @@
  *  TRUE if accessible FALSE otherwise.
  */
 function si_exhibition_check_object_info_accessible(array $object_info) {
+  //BBB Until we are different about permissions, assume the user can access it
+  return TRUE;
   $repo = tuque_wrapper_get_repository_instance();
+  si_exhibition_debug('repo from si_exhibition_check_object_info_accessible');
   try {
     $object = $repo->getObject($object_info['pid']);
     // @todo remove object from cache.
@@ -48,6 +51,7 @@ function si_exhibition_check_parent_in_tree(array $object_info, $tree_pid) {
  */
 function si_exhibition_get_parent_info(FedoraObject $object, $skipNonTreeParents = false) {
   $repo = tuque_wrapper_get_repository_instance();
+  si_exhibition_debug('repo from si_exhibition_get_parent_info');
   $query = si_exhibition_generate_parent_concept_query($object->id);
   $results = $repo->ri->itqlQuery($query);
   $parents = array_map(function($o) {
@@ -103,8 +107,20 @@ function si_exhibition_generate_parent_concept_query($pid) {
  *    pid, label
  */
 function si_exhibition_get_child_concept_info(FedoraObject $object) {
+  return si_exhibition_get_child_concept_info_by_id($object->id);
+}
+function si_exhibition_get_child_concept_info_by_id($object_id) {
+  //Start cache check for return
+  $cache_name = 'child_concept_info';
+  $cache_index = $object_id;
+  $to_return = si_exhibition_cache($cache_name,$cache_index);
+  if (!empty($to_return)){ return $to_return; }
+  si_exhibition_cron_cache(__FUNCTION__, func_get_args());
+  //End cache
+
   $repo = tuque_wrapper_get_repository_instance();
-  $query = si_exhibition_generate_child_concept_query($object->id);
+  si_exhibition_debug('repo from si_exhibition_get_child_concept_info');
+  $query = si_exhibition_generate_child_concept_query($object_id);
   $results = $repo->ri->itqlQuery($query);
   $children = array_map(function($o) { return array('pid' => $o['o']['value'], 'label' => $o['t']['value'], 'count' => $o['k0']['value']); }, $results);
   // @todo replace the checks for each objects existance once we have the appropriate information in the rels to determine if its accessible.
@@ -116,7 +132,7 @@ function si_exhibition_get_child_concept_info(FedoraObject $object) {
   //var_dump ($children);
   $to_return = array_filter($children, 'si_exhibition_check_object_info_accessible');
   //var_dump($to_return);
-  return $to_return;
+  return si_exhibition_cache($cache_name, $cache_index, $to_return);
 }
 
 /**
@@ -160,14 +176,17 @@ function si_exhibition_debug($message, $object = NULL){
 /*
  * Returns the data from the cache if called with a cache_name and a cache_id
  * Returns the entire cached array if called with a cache_name, empty string and no third param
- * Saves data in the cache if second parameter has a value
+ * Returns the "overwrite" parameter if it has a value
+ * Saves data in the cache if "overwrite" parameter has a value
  * If permanent set to true, will not expire
  */
 function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE, $permanent = FALSE){
+  global $tnum;
   si_exhibition_debug("si_exhibition_cache $cache_name | $cache_data_index | $overwrite | $permanent |");
   if (!variable_get('si_exhibition_cache_on',TRUE)){
     si_exhibition_debug("si_exhibition_cache is turned off");
-    return NULL; //If caching is turned off, don't use caching!
+    if ($overwrite !== FALSE) return $overwrite; //If caching is turned off, don't use caching!
+    return NULL;
   }
   $prefix = 'si_exhibition_cache_';
   $cache_table_for_clearing = 'cache';
@@ -186,6 +205,16 @@ function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE,
       }
     }
   }else{
+    /*
+    if (!is_string($overwrite)){
+      if (empty($tnum)) $tnum = 0;
+      $tnum++;
+      print 'NOT STRING wbt';
+      var_dump($overwrite);
+      debug_print_backtrace();
+      if ($tnum > 1) exit();
+    }
+    */
     $data = array();
     if ($cache_info = cache_get($prefix.$cache_name, $cache_table_for_clearing)){
       $data = $cache_info->data;
@@ -198,7 +227,7 @@ function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE,
     }
     si_exhibition_debug("si_exhibition_cache setting cache $prefix | $cache_name", $data);
     cache_set($prefix.$cache_name, $data, $cache_table_for_clearing, $expire_date_time);
-    return NULL;
+    return $overwrite;
   }
   si_exhibition_debug("si_exhibition_cache returning nothing found in cache");
   return NULL;
@@ -222,7 +251,10 @@ function si_exhibition_cron_cache($function_name = FALSE, $arguments = FALSE){
     $current_cron_cache[$function_name] = array(); 
   }
   if ($arguments === FALSE) return $current_cron_cache[$function_name];
-  $current_cron_cache[$function_name][] = $arguments;
+
+  //Not a simple return, so it's a storage.  Already created the cache if it didn't exist yet
+  //Now store the arguments (if they are not stored yet)
+  if (!in_array($arguments, $current_cron_cache[$function_name])) $current_cron_cache[$function_name][] = $arguments;
   si_exhibition_cache('cron_check',$function_name, $current_cron_cache[$function_name], TRUE);
 }
 /**
@@ -235,9 +267,9 @@ function si_exhibition_cron_cache($function_name = FALSE, $arguments = FALSE){
  * @param string $sort
  *   The sort to apply to the resources label either ('asc', 'desc').
  * @param int $limit
- *   The number of results to limit this query to.
+ *   The number of results to limit this query to.  Not used normally since this information is also used for a count of resources.
  * @param int $offset
- *   The offset into the number of results to truncate from the results.
+ *   The offset into the number of results to truncate from the results. Not used normally since this information is also used for a count of resources.
  *
  * @return array
  *   An array of array's containing the following key value pairs for each child concpet of the given object:
@@ -247,10 +279,13 @@ function si_exhibition_get_child_resource_info(FedoraObject $object, $type = 'al
   return si_exhibition_get_child_resource_info_by_id($object->id, $type, $sort, $limit, $offset);
 }
 function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', $sort = 'asc', $limit = NULL, $offset = NULL) {
-  $cache_data_index = $object_id.$type.$sort.$limit.$offset;
-  $cache_name = 'get_child_resource_info';
-  $to_return = si_exhibition_cache($cache_name, $cache_data_index);
+  //Start cache check for return
+  $cache_name = 'child_resource_info';
+  $cache_index = $object_id.'_'.$type.'_'.$sort.'_'.$limit.'_'.$offset;
+  $to_return = si_exhibition_cache($cache_name,$cache_index);
   if (!empty($to_return)){ return $to_return; }
+  si_exhibition_cron_cache(__FUNCTION__, func_get_args());
+  //End cache
 
   $resource_types = array(
     'all' => array(),
@@ -268,8 +303,18 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
     $results = $repo->ri->itqlQuery($query);
     $resources = array_map(function($o) { return array('pid' => $o['o']['value'], 'label' => $o['t']['value']); }, $results);
     // @todo replace the checks for each objects existance once we have the appropriate information in the rels to determine if its accessible.
-    $resources =  array_filter($resources, 'si_exhibition_check_object_info_accessible');
-    foreach ($resources as $key => $resource) {
+    //$resources =  array_filter($resources, 'si_exhibition_check_object_info_accessible'); //BBB Security changes will necessitate this being used
+  }
+  $to_return = $resources;
+  return si_exhibition_cache($cache_name, $cache_index, $to_return);
+}
+function si_exhibition_fill_out_resources(&$resources, $show, $limit = NULL, $offset = NULL){
+  if (empty($limit)) $limit = sizeof($resources);
+  if (empty($offset)) $offset = 0;
+  $repo = tuque_wrapper_get_repository_instance();
+  si_exhibition_debug('repo from si_exhibition_fill_out_resources');
+  foreach ($resources as $key => $resource) {
+    if ($key >= $offset && $key <= $offset+$limit){
       $object = $repo->getObject($resource['pid']); // We know it exists from the previous filter call.
       $resources[$key]['models'] = $object->models;
       $resources[$key]['datastreams'] = array();
@@ -287,12 +332,7 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
       }
     }
   }
-  si_exhibition_cron_cache(__FUNCTION__, func_get_args());
-  si_exhibition_cache($cache_name, $cache_data_index, $resources);
-
-  return $resources;
 }
-
 /**
  * Query for fetching the Child Resources given what type of data they disseminate.
  *
@@ -322,7 +362,7 @@ function si_exhibition_generate_child_resource_query($pid, array $resource_types
   }
   $limit = isset($limit) ? "limit $limit" : '';
   $offset = isset($offset) ? "offset $offset" : '';
-  return 'select $o $t $m from <#ri> where
+  $to_return = 'select $o $t $m from <#ri> where
     $o <fedora-model:state> <fedora-model:Active> and
     $o <fedora-model:label> $t and
     <info:fedora/' . $pid . '> <fedora-rels-ext:hasResource> $o and
@@ -333,6 +373,8 @@ function si_exhibition_generate_child_resource_query($pid, array $resource_types
     order by $t ' . $sort . '
     ' . $limit . '
     ' . $offset;
+  si_exhibition_debug('<pre>'.htmlspecialchars($to_return).'</pre>');
+  return $to_return;
 }
 /*
 */
@@ -389,6 +431,7 @@ function si_exhibition_get_pager_parameters() {
 function si_exhibition_get_datastream_contents(FedoraObject $object, $dsid) {
   if (isset($object[$dsid])) {
     $repo = tuque_wrapper_get_repository_instance();
+    si_exhibition_debug('repo from si_exhibition_get_datastream_contents');
     return $repo->api->a->getDatastreamDissemination($object->id, $dsid, NULL); // Work around for bug in Tuque API: ISLANDORA-752
   }
   return '';
