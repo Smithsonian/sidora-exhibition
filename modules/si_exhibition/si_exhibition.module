@@ -1537,6 +1537,8 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
   curl_setopt($ch, CURLOPT_URL, $url_to_get);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
   curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
   curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
   $data = curl_exec($ch);
   
