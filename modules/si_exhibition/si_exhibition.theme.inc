@@ -39,12 +39,21 @@ function si_exhibition_preprocess_si_exhibition_resources(array &$variables) {
   };
   // Limit types
   $variables['limit_types'] = array('all' => t('All'), 'images' => t('Images'), 'pdf' => t('PDF'), 'text' => t('Text'), 'csv' => t('CSV'), 'video' => t('Video'));
+  /*
+  array_walk(
+    $limit_types, 
+    function($v, $k, $vars) use($pager_link) { 
+      $vars[] = $pager_link($v, 'show', $k); 
+    }, 
+    $variables['limit_types']
+  );
+  */
   // Results per Page
   $variables['results_per_page'] =  array('10', '15', '20', '25', '30');
+  //array_walk($results_per_page, function($v, $k, $vars) use($pager_link) { $vars[] = $pager_link($v, 'limit', $v); }, $variables['results_per_page']);
   // Table
   $resources = si_exhibition_get_child_resource_info($variables['object'], $show, $sort); // For now we ignore the $limit and offset $offset, we must check each resource.
-  si_exhibition_fill_out_resources($resources, $show, $limit, $offset);
-  $variables['table'] = theme('si_exhibition_resource_table', array('resources'=>$resources, 'show'=>$show, 'limit'=>$limit, 'offset'=>$offset));
+  $variables['table'] = theme('si_exhibition_resource_table', array('resources'=>$resources, 'show'=>$show, 'offset'=>$offset, 'limit'=>$limit));
   // Pager
   $variables['total'] = $total = count($resources);
   si_exhibition_pager_init($total, $limit, 0);
@@ -89,7 +98,6 @@ function theme_si_exhibition_resource_table($vars){
  *   A drupal table row definition for using in the resources table.
  */
 function _si_exhibition_get_resource_table_row(array $resource) {
-  if (empty($resource['models'])) {return '';}
   $display_datastream_function = '';
   // @todo use drupal behaviours and settings instead.
   $display_definitions = array(
@@ -150,7 +158,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   if (is_array($display['view'])) foreach($display['view'] as $curr_view) if (array_search($curr_view, $resource['datastreams']) !== FALSE) $available_view = $curr_view;
   if (!empty($available_view)){ $display['view'] = $available_view;  }
 
-  //print '<div>'; var_dump($display); print '</div>';
+  //print '<div>'; var_dump($display); print '</div>';  //BBB
   if (array_search($display['view'], $resource['datastreams']) !== FALSE) {
     $thumbnail_url = url("fedora/repository/{$resource['pid']}/TN");
     $view_preview = (isset($display['tn']) && array_search('TN', $resource['datastreams']) !== FALSE) ? "<img class='resource-tn' src='$thumbnail_url'/>" : '';
@@ -287,24 +295,50 @@ function theme_si_exhibition_child_concepts($vars){
   );
   return $header . (empty($links) ? t('This item has no child concepts.') : theme('item_list', $item_list_array));
 }
-/*
- * Returns the xml transformed by xsl, determined by the workbench if available, and the default xsl if not
- *
- */
+function si_exhibition_all_meta($object){
+  $datastream_content = '';
+  foreach($object as $dsid_loop=>$datastream_loop){
+    //strip off the <?xml directives if it has any and remove binary data
+    $content = $datastream_loop->content;
+    $doc = new DOMDocument();
+    if (substr(trim($content),0,1) == '<'){
+      $doc->loadXML($content);
+      $datastream_content .= $doc->saveHTML();
+    }
+  }
+  return $datastream_content;
+}
 function theme_si_exhibition_metadata_xmls($vars){
   $object = $vars['object'];
   $rows = si_models_get_display_xmls($object->id);
-  $datastream_content =  si_exhibition_meta_string_for_xslt($object);
+  /*
+  $output = '<xml_root>';
+  //$output .= '<debug>test</debug>';
+  foreach($rows as $row){
+    //if it has the <?xml directive, that needs to be taken out
+    if (strpos($row[1], '<?xml') !== FALSE){
+      //Assume it ends with the ? > characters
+      $toCheckLines = explode('?'.'>',$row[1]);
+      $outputLine = '';
+      foreach($toCheckLines as $checkLine){
+        if (strpos($checkLine, '<?xml') === FALSE){
+          $outputLine .= $checkLine;
+        }
+      }
+      $output .= $outputLine;
+    }else{
+      $output .= $row[1];
+    }
+  }
+  $output .= '</xml_root>';
+  */
+  $datastream_content =  si_exhibition_all_meta($object);
+  $datastream_content = '<xml_root><general_info><owner>'.$object->owner.'</owner><label>'.$object->label.'</label></general_info>'."\n".$datastream_content."\n".'</xml_root>';
   $output = $datastream_content;
   $doc = new DOMDocument();
   $xsl = new XSLTProcessor();
-  $xsl_string = si_exhibition_xsl_string($object->id);
-  if ($xsl_string === FALSE){
-    //No XSL string (bad news)
-    drupal_set_message("Configuration problem, could not obtain XSL information from configured XSL provider. This usually means the exhibition server cannot contact the workbench server.", "error");
-    return '';
-  }
-  $doc->loadXML(si_exhibition_xsl_string($object->id));
+  
+  $doc->loadXML(si_exhibition_xsl_string());
   $xsl->importStyleSheet($doc);
   $docToLoad = ('<?xml version="1.0" encoding="UTF-8"?'.'>'.$output);
   $doc->loadXML($docToLoad);
@@ -325,8 +359,10 @@ function theme_si_exhibition_metadata_xmls($vars){
 	  if ($_GET['output'] == 'xsl'){
 	    print si_exhibition_xsl_string();
 	    exit();
-    }
+          }
   }
+  /*
+  */
   $initialOutput = $xsl->transformToXML($doc);
   //now go through and add the even/odd classes
   $tableRows = explode("<tr>",$initialOutput);

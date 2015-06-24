@@ -157,6 +157,10 @@ function si_exhibition_theme($existing, $type, $theme, $path) {
 function si_exhibition_block_info() {
   $blocks = array();
 
+  if (!_si_show_exhibition()) {
+    return $blocks;
+  }
+
   if (($expose_block = variable_get('si_exhibition_expose_block', 'no')) == 'no') {
     return $blocks;
   }
@@ -232,7 +236,6 @@ function si_exhibition_block_view($delta='') {
     $pid_for_config = arg(2);
     $pid = (arg(2) ? arg(2) : variable_get('fedora_repository_pid', 'si:root'));
     $repo = tuque_wrapper_get_repository_instance();
-    si_exhibition_debug('repo from si_exhibition_block_view');
     $object = $repo->getObject($pid); // We know it exists if we got passed the header checks
     
     switch ($delta) {
@@ -278,40 +281,24 @@ function si_exhibition_block_view($delta='') {
   }
 }
 
-/*
- * Return if this exhibition should be shown
- */
 function _si_show_exhibition(){
-  require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
-  $path = filter_input(INPUT_GET, 'path');
-  $pid_on_url = arg(2); 
-
-  //Start cache check for return
-  $cache_name = 'show_exhibition';
-  $cache_index = $pid_on_url.'_'.$path;
-  $to_return = si_exhibition_cache($cache_name,$cache_index);
-  if (!empty($to_return)){ return $to_return; }
-  si_exhibition_cron_cache(__FUNCTION__, func_get_args());
-  //End cache
-
-  // $bad_path and $bad_path_set are just for this function if caching is turned off
-  global $bad_path_set;
-  global $bad_path;
-  if ($bad_path_set) return !$bad_path;
-  $tree_pid_list = array();
-  $bad_path = false;
-  if (!empty($path)){
-    $path_list = explode(',',$path);
-    if (!empty($path_list[0])){
-      $tree = _si_exhibition_get_pid_tree($path_list[0], null, $tree_pid_list);
-      if (!in_array($pid_on_url,$tree_pid_list)){
-        $bad_path = true;
+    global $bad_path_set;
+    global $bad_path;
+    if ($bad_path_set) return !$bad_path;
+    $tree_pid_list = array();
+    $bad_path = false;
+    $path = filter_input(INPUT_GET, 'path');
+    if (!empty($path)){
+      $path_list = explode(',',$path);
+      if (!empty($path_list[0])){
+        $tree = get_pid_tree($path_list[0], null, $tree_pid_list);
+        if (!in_array(arg(2),$tree_pid_list)){
+          $bad_path = true;
+        }
       }
     }
-  }
-  $bad_path_set = TRUE;
-  $to_return = !($bad_path);
-  return si_exhibition_cache($cache_name, $cache_index, $to_return);
+    $bad_path_set = TRUE;
+    return !($bad_path);
 }
 
 
@@ -344,8 +331,8 @@ function si_exhibition_preprocess_page(&$variables) {
       //logo is the image
       //site_slogan is under the name
       //site_name is the main name
-      if (array_key_exists('logo', $se)) $variables['logo'] = $se['logo']; else $variables['logo'] = '';
-      if (array_key_exists('title', $se)) $variables['site_name'] = $se['title']; else $variables['site_name'] = '';
+      $variables['logo'] = $se['logo'];
+      $variables['site_name'] = $se['title'];
       //$variables['site_slogan'] = ' sitey slogany'.arg(2);
       $variables['sidora_exhibition'] = $se;
       $variables['primary_links_tree'] = drupal_render(menu_tree_output(menu_tree_all_data('main-menu')));
@@ -361,10 +348,8 @@ function si_exhibition_preprocess_page(&$variables) {
  * Menu callback that replaces the default callback for fedora/repository.
  */
 function si_exhibition($pid = NULL, $dsid = NULL) {
-  require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $pid = isset($pid) ? $pid : variable_get('fedora_repository_pid', 'si:root');
   $repo = tuque_wrapper_get_repository_instance();
-  si_exhibition_debug('repo from si_exhibition');
   // Check if we can access the repository and the requested object.
   try {
     $description = $repo->api->a->describeRepository(); // Check for repository access
@@ -432,10 +417,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
   }
   
 }
-/*
- * Intended to determine if this should be viewable, but right now 
- * just checks to see if the pid is valid
- */
+
 function si_exhibition_check_view_permission($object_pid) {
   $xacml_dsid = 'POLICY';
 
@@ -480,63 +462,7 @@ function si_exhibition_check_view_permission($object_pid) {
   }
   return false;
 }
-function si_exhibition_meta_string_for_xslt($object){
-  $pid = $object->id;
-  $xsl_config = '';
-  if (!empty($pid)){
-    $url_to_get =
-      variable_get('si_exhibition_workbench_xsl', '')
-      . 'xsl_config/' .
-      urlencode($pid);
-    $ch = curl_init();
-    $timeout = 60;
-    curl_setopt($ch, CURLOPT_URL, $url_to_get);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
-    $data = curl_exec($ch);
 
-    //echo 'si_exhibition.module: line 1534<br><pre>' . print_r($data, true) . '</pre>';
-
-    if ($data === FALSE){
-      $curl_error_string = curl_error($ch);
-      print 'Could not obtain data from:'.$url_to_get.'<br/>'."\n";
-      print $curl_error_string.'<br/>'."\n";
-      $info = curl_getinfo($ch);
-      print_r ($info);
-      curl_close($ch);
-      $se = array();
-      $se['error'] = $curl_error_string;
-      $_REQUEST['store_pid_config_'.$pid] = $se;
-      return $se;
-    }
-    curl_close($ch);
-    $xsl_config = json_decode($data);
-
-  }
-  $specific_meta = '';
-  if (!empty($xsl_config)){
-    $specific_meta = $xsl_config->dsid;
-  }
-  $datastream_content = '';
-  if (empty($specific_meta)){
-    foreach($object as $dsid_loop=>$datastream_loop){
-      //strip off the <?xml directives if it has any and remove binary data
-      $content = $datastream_loop->content;
-      $doc = new DOMDocument();
-      if (substr(trim($content),0,1) == '<'){
-        $doc->loadXML($content);
-        $datastream_content .= $doc->saveHTML();
-      }
-    }
-    $datastream_content = '<xml_root><general_info><owner>'.$object->owner.'</owner><label>'.$object->label.'</label></general_info>'."\n".$datastream_content."\n".'</xml_root>';
-  }else{
-    $datastream_content = $object[$specific_meta]->content;
-  }
-  return $datastream_content;
-}
 /**
  * Menu callback for redirecting to a specific page.
  *
@@ -549,63 +475,17 @@ function si_exhibition_custom_url($cu) {
   $my_pid = file_get_contents( $url  );
   drupal_goto('fedora/repository/'.$my_pid);
 }
-/*
- * Returns the xsl we are using directly to the browser
- */
+
 function si_exhibition_xsl(){
   header('Content-Type: text/xml');
   print si_exhibition_xsl_string();
   exit();
 }
-/*
- * Get the xsl string to transform the metadata
- */
-function si_exhibition_xsl_string($pid){
-  $my_xsl = '';
-  if (!empty($pid)){
-    $url_to_get =
-      variable_get('si_exhibition_workbench_xsl', '')
-      . 'xsl/' .
-      urlencode($pid);
-    $ch = curl_init();
-    $timeout = 60;
-    curl_setopt($ch, CURLOPT_URL, $url_to_get);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
-    $data = curl_exec($ch);
-
-    //echo 'si_exhibition.module: line 1534<br><pre>' . print_r($data, true) . '</pre>';
-
-    if ($data === FALSE){
-      $curl_error_string = curl_error($ch);
-      print 'Could not obtain data from:'.$url_to_get.'<br/>'."\n";
-      print $curl_error_string.'<br/>'."\n";
-      $info = curl_getinfo($ch);
-      print_r ($info);
-      curl_close($ch);
-      $se = array();
-      $se['error'] = $curl_error_string;
-      $_REQUEST['store_pid_config_'.$pid] = $se;
-      return FALSE;
-    }
-    curl_close($ch);
-    $my_xsl = $data;
-
-  }
-  if (empty($my_xsl)){ 
-    return variable_get('si_exhibition_metadata_xsl',si_exhibition_xsl_string_default());
-  }else{
-    return $my_xsl;
-  }
+function si_exhibition_xsl_string(){
+  return variable_get('si_exhibition_metadata_xsl',si_exhibition_xsl_string_default());
 }
-/*
- * Return a hard-coded built in xsl string (for first install mostly)
- */
 function si_exhibition_xsl_string_default(){
-  return '<?xml version="1.0" encoding="UTF-8"?'.'>
+  return '<?xml version="1.0" encoding="UTF-8"?>
 
 <xsl:stylesheet version="1.0"
 xmlns:xsl="http://www.w3.org/1999/XSL/Transform"
@@ -1584,7 +1464,6 @@ function si_exhibition_get_datastream_as_json() {
   // List of viewable data streams directly from the URL
   $theme = array('TEXT' => 'si_exhibition_text_datastream', 'CSV' => 'si_exhibition_csv_datastream', 'METADATA' => 'si_exhibition_metadata', 'METADATA_XMLS' => 'si_exhibition_metadata_xmls');
   $repo = tuque_wrapper_get_repository_instance();
-  si_exhibition_debug('repo from si_exhibition_get_datastream_as_json');
   $object = $repo->getObject($pid); // If listed in the resources we know we already have access to it.
   $output = isset($theme[$dsid]) ? theme($theme[$dsid], array('object'=>$object)) : t('An Error Occured.');
   /*
@@ -1623,9 +1502,7 @@ function si_exhibition_theme_registry_alter(&$theme_registry) {
   array_unshift($theme_registry[$theme_hook]['theme paths'], $modulepath);
 }
 */
-/*
- * Set the javascript that is necessary for the exhibition, unsetting existing jQuerys
- */
+
 function si_exhibition_update_js(&$variables) {
   // Get scripts
   $scripts = drupal_add_js();
@@ -1642,28 +1519,11 @@ function si_exhibition_update_js(&$variables) {
   drupal_add_js($modulepath.'/js/jstree/dist/jstree.min.js');
   drupal_add_js($modulepath.'/js/si_exhibition.js');
 }
-/*
- * Return the display configuration object
- * If it's not already stored for this call, go get it from the exhibition_config server
- * Will return NULL on errors and may set drupal error messages during the error processing
- */
+
 function si_exhibition_get_item_display_config($pid,$nav_to_pid){
-  $path = filter_input(INPUT_GET, 'path');
-  $pid_on_url = arg(2); 
-
-  //Start cache check for return
-  $cache_name = 'item_display_config';
-  $cache_index = $pid.'_'.$nav_to_pid;
-  $to_return = si_exhibition_cache($cache_name,$cache_index);
-  if (!empty($to_return)){ return $to_return; }
-  si_exhibition_cron_cache(__FUNCTION__, func_get_args());
-  //End cache
-
-
   //This is called a bunch of times, cache the info for the request at least
   if (!empty($_REQUEST['store_pid_config_'.$pid])){
-    $to_return = $_REQUEST['store_pid_config_'.$pid];
-    return si_exhibition_cache($cache_name, $cache_index, $to_return);
+    return $_REQUEST['store_pid_config_'.$pid];
   }
   $to_print = '';
   $url_to_get =
@@ -1673,13 +1533,11 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
     .
     urlencode($pid);
   $ch = curl_init();
-  $timeout = 60;
+  $timeout = 500;
   curl_setopt($ch, CURLOPT_URL, $url_to_get);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
   curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
   curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
-    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
-    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
   $data = curl_exec($ch);
   
   //echo 'si_exhibition.module: line 1534<br><pre>' . print_r($data, true) . '</pre>';
@@ -1694,43 +1552,40 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
     $se = array();
     $se['error'] = $curl_error_string;
     $_REQUEST['store_pid_config_'.$pid] = $se;
-    $to_return = $se;
-    return si_exhibition_cache($cache_name, $cache_index, $to_return);
+    return $se;
   }
   curl_close($ch);
   $my_json = $data;
   $se = json_decode($my_json,true);
   if ($se['error'] === TRUE){
     drupal_set_message(t('This item is unavailable for view. You may attempt downloading.'), 'error', FALSE);
-    $to_return = null;
-    return si_exhibition_cache($cache_name, $cache_index, $to_return);
+    return;
   }
   if (isset($se['nav_type']) && $se['nav_type'] == 'tree'){
     $block = module_invoke('si_exhibition', 'block_view', 'seu_nav');
     //See if the tree should start on the current node or if there is a path
+    $path = filter_input(INPUT_GET, 'path');
     //if we have a path, make sure we can access that path
     $tree = NULL;
+
     $tree_pid_list = array();
-
-
     if (empty($path)){
-      $tree = _si_exhibition_get_pid_tree($pid_on_url, null, $tree_pid_list);
+      $tree = get_pid_tree(arg(2), null, $tree_pid_list);
     }else{
       $path_list = explode(',',$path);
       if (!empty($path_list[0])){
-        $tree = _si_exhibition_get_pid_tree($path_list[0], null, $tree_pid_list);
-        if (!in_array($pid_on_url,$tree_pid_list)){
+        $tree = get_pid_tree($path_list[0], null, $tree_pid_list);
+        if (!in_array(arg(2),$tree_pid_list)){
           watchdog('exhibition','Bad tree structure');
           drupal_not_found();
-          $to_return = null;
-          return si_exhibition_cache($cache_name, $cache_index, $to_return);
+          return null;
         }
       }
     }
-    $to_print .= '<div id="forjstree" style="overflow:auto;"><ul>'.si_exhibition_get_printable_tree($tree).'</ul></div>';//['pid'];
+    $curr_pos = $tree;
+    $to_print .= '<div id="forjstree" style="overflow:auto;"><ul>'.get_printable_tree($curr_pos).'</ul></div>';//['pid'];
   } else {
      $repo = tuque_wrapper_get_repository_instance();
-     si_exhibition_debug('repo from si_exhibition_get_item_display_config');
      $object = $repo->getObject($nav_to_pid);
      $to_print = '<h2 class="title block-title">SI Navigation</h2>';
      $to_print .= theme('si_exhibition_navigation', array('object'=>$object));
@@ -1740,13 +1595,9 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
   if ($se['nav_location'] == 'bleft') $se['seu_nav_first_bottom'] = $to_print;//$block['content'];
   if ($se['nav_location'] == 'bright') $se['seu_nav_last_bottom'] = $to_print; //$block['content'];
   $_REQUEST['store_pid_config_'.$pid] = $se;
-  $to_return = $se;
-  return si_exhibition_cache($cache_name, $cache_index, $to_return);
+  return $se;
 }
-/*
- * Returns a SIdora tree in html format
- */
-function si_exhibition_get_printable_tree($tree_pos, $current_path = ''){
+function get_printable_tree($tree_pos, $current_path = ''){
   $label = $tree_pos['object']->label;
   if (empty($label)){
     print_r($tree_pos);
@@ -1760,38 +1611,28 @@ function si_exhibition_get_printable_tree($tree_pos, $current_path = ''){
     if ($current_path != '') $current_path .= ',';
     $output .= '<ul>';
     foreach ($tree_pos['children'] as $curr ){
-      $output .= si_exhibition_get_printable_tree($curr, $current_path.$tree_pos['pid']);
+      $output .= get_printable_tree($curr, $current_path.$tree_pos['pid']);
     }
     $output .= '</ul>';
   }
   $output .= '</li>';
   return $output;
 }
-/*
- * return the php object representing the fedora tree
- */
-function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array()){
-  //Request level cache
-  //$req_key = $pid.'_'.$owner_id.'_'.implode(':',$pid_list);
-  //global $get_pid_tree_request;
-  //if (empty($get_pid_tree_request)) $get_pid_tree_request = array();
-  //if (array_key_exists($req_key,$get_pid_tree_request)) return $get_pid_tree_request[$req_key];
 
+function get_pid_tree($pid, $owner_id, &$pid_list = array()){
+  require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $to_return = array();
   $to_return['pid'] = $pid;
-  $repo = tuque_wrapper_get_repository_instance();
-  si_exhibition_debug('repo from _si_exhibition_get_pid_tree');
   if (in_array($pid, $pid_list)){
     //already did this, duplicate found:
     //dsm('found this pid in the tree already:'.$pid);
+    $repo = tuque_wrapper_get_repository_instance();
     $object = $repo->getObject($pid);
     $to_return['object'] = $object;
     $to_return['already_in_tree'] = TRUE;
-
-    //$get_pid_tree_request[$req_key] = $to_return; //request level cache
-
     return $to_return;
   }
+  $repo = tuque_wrapper_get_repository_instance();
   try{
     $exist = si_exhibition_check_object_info_accessible(array('pid' => $pid));
     if ($exist){
@@ -1805,50 +1646,18 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array()){
       foreach($children as $child){
         //Build the tree from all the children
         //for each child, get their sub-tree
-        $to_return['children'][] = _si_exhibition_get_pid_tree($child['pid'],$owner_id,$pid_list);
+        $to_return['children'][] = get_pid_tree($child['pid'],$owner_id,$pid_list);
       }
-      //$get_pid_tree_request[$req_key] = $to_return; //request level cache
       return $to_return;
     }else{
       dsm('doesnt exist:'.$pid);
-      $to_return = null;
-      //$get_pid_tree_request[$req_key] = $to_return; //request level cache
-      return $to_return;
+      return null;
     }
   }catch(Exception $hce){
     dsm('exception trying to get:'.$pid);
-    $to_return = null;
-    //$get_pid_tree_request[$req_key] = $to_return; //request level cache
-    return $to_return;
+    return null;
   }
 }
-/*
- * hook_cron() to be run with the cron jobs, check fedora to see if there's new information to cache
- */
-function si_exhibition_cron(){
-  return;  //BBB
-  require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
-  $cron_check = si_exhibition_cron_cache(); 
-  cache_clear_all('si_exhibition_cache_', 'cache', TRUE);  //Clear the main cache
-  if (empty($cron_check)){
-    return;
-  }
-  foreach($cron_check as $fn_name => $fn_args_arrays){
-    drupal_set_message("si_exhibition reestablishing caches for:".$fn_name);
-    foreach($fn_args_arrays as $fn_args){
-      //if it's _si_exhibition_get_pid_tree only make the calls where the array is blank, as the others are unnecessary and we worry about pass by ref
-      if ($fn_name == '_si_exhibition_get_pid_tree'){
-        $pid_list = array();
-        _si_exhibition_get_pid_tree($fn_args[0],$fn_args[1],$pid_list);
-      }else{
-        call_user_func_array($fn_name, $fn_args);
-      }
-    }
-  }
-}
-/*
- * Return the form that will change the table presented in the middle of the exhibition screen in the browser
- */
 function exhibition_resources_form($form, &$form_state){
   $form['#method'] = 'get';
   foreach($_GET as $param_name => $param_value){
