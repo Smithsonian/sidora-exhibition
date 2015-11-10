@@ -38,7 +38,7 @@ function si_exhibition_preprocess_si_exhibition_resources(array &$variables) {
     return $current ? '<strong>' . $text . '</strong>' : l($text, $_GET['q'], array('query' => $pager_params));
   };
   // Limit types
-  $variables['limit_types'] = array('all' => t('All'), 'images' => t('Images'), 'pdf' => t('PDF'), 'text' => t('Text'), 'csv' => t('CSV'), 'video' => t('Video'));
+  $variables['limit_types'] = array('all' => t('All'), 'images' => t('Images'), 'pdf' => t('PDF'), 'text' => t('Text'), 'csv' => t('CSV'), 'audio' => t('Audio'), 'video' => t('Video'));
   // Results per Page
   $variables['results_per_page'] =  array('10', '15', '20', '25', '30');
   // Table
@@ -125,7 +125,23 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       'func' => 'si_exhibition_flexpaper',
       'type' => array('r-pdf', 'pdf'), // Icon, Label
       'class' => 'resources-pdf'
-    )
+    ),
+    'islandora:sp-audioCModel' => array(
+      'dsid' => array('OBJ'),
+			'view' => array('PROXY_MP3'),
+			'tn' => TRUE,
+      'func' => 'si_exhibition_ds',
+      'type' => array('r-csv', 'csv'), // Icon, Label
+      'class' => 'resources-audio'
+    ),
+    'islandora:sp_videoCModel' => array(
+      'dsid' => array('OBJ'),
+			'view' => array('MP4'),
+			'tn' => TRUE,
+      'func' => 'si_exhibition_ds',
+      'type' => array('r-csv', 'csv'), // Icon, Label
+      'class' => 'resources-video'
+    ),
   );
   /*
   print '<div style="padding:20px;">';
@@ -133,9 +149,10 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   print '</div>';
   var_dump(array_intersect_key($display_definitions, array_flip($resource['models'])));
   */
+ 
   $display = array_pop(array_intersect_key($display_definitions, array_flip($resource['models']))); // Assuming an object can't be two types of resources.
   if (empty($display)) return; //BBB
-  $display['url'] = (isset($display['url'])?$display['url']:'');
+	$display['url'] = (isset($display['url'])?$display['url']:'');
   $label = $resource['label'];
   // Metadata
   //$display_metadata_function = 'return si_exhibition_ds("' . $resource['pid'] . '", "METADATA")';

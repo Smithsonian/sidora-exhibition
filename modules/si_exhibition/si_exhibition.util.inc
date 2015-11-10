@@ -246,6 +246,7 @@ function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE,
 function si_exhibition_cron_cache($function_name = FALSE, $arguments = FALSE){
   $current_cron_cache = si_exhibition_cache('cron_check','', FALSE, TRUE);
   if ($current_cron_cache == NULL) $current_cron_cache = array();
+  si_exhibition_debug("si_exhibition_cron_cache $function_name");
   if ($function_name === FALSE) return $current_cron_cache;
   if (!array_key_exists($function_name, $current_cron_cache) || !is_array($current_cron_cache[$function_name])){
     $current_cron_cache[$function_name] = array(); 
@@ -293,14 +294,15 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
     'pdf' => array('si:fieldbookCModel'),
     'csv' => array('si:datasetCModel'),
     'text' => FALSE,
-    'video' => FALSE
+    'video' => array('islandora:sp_videoCModel'),
+		'audio' => array('islandora:sp-audioCModel')
   );
   $resources = array();
   $resource_types = isset($resource_types[$type]) ? $resource_types[$type] : FALSE;
   if ($resource_types !== FALSE) {
     $repo = tuque_wrapper_get_repository_instance();
     $query = si_exhibition_generate_child_resource_query($object_id, $resource_types, $sort, $limit, $offset);
-    $results = $repo->ri->itqlQuery($query);
+		$results = $repo->ri->itqlQuery($query);
     $resources = array_map(function($o) { return array('pid' => $o['o']['value'], 'label' => $o['t']['value']); }, $results);
     // @todo replace the checks for each objects existance once we have the appropriate information in the rels to determine if its accessible.
     //$resources =  array_filter($resources, 'si_exhibition_check_object_info_accessible'); //BBB Security changes will necessitate this being used
@@ -314,7 +316,7 @@ function si_exhibition_fill_out_resources(&$resources, $show, $limit = NULL, $of
   $repo = tuque_wrapper_get_repository_instance();
   si_exhibition_debug('repo from si_exhibition_fill_out_resources');
   foreach ($resources as $key => $resource) {
-    if ($key >= $offset && $key <= $offset+$limit){
+     if ($key >= $offset && $key <= $offset+$limit){
       $object = $repo->getObject($resource['pid']); // We know it exists from the previous filter call.
       $resources[$key]['models'] = $object->models;
       $resources[$key]['datastreams'] = array();

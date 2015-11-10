@@ -1868,6 +1868,8 @@ function exhibition_resources_form($form, &$form_state){
       'images' => t('Images'),
       'pdf' => t('Digitized Text (pdf)'),
       'csv' => t('Tabular Datasets'),
+			'audio' => t('Audio'),
+			'video' => t('Video'),
     ),
   );
   $form['limit'] = array(
