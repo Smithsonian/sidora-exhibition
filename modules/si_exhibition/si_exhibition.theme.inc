@@ -38,7 +38,7 @@ function si_exhibition_preprocess_si_exhibition_resources(array &$variables) {
     return $current ? '<strong>' . $text . '</strong>' : l($text, $_GET['q'], array('query' => $pager_params));
   };
   // Limit types
-  $variables['limit_types'] = array('all' => t('All'), 'images' => t('Images'), 'pdf' => t('PDF'), 'text' => t('Text'), 'csv' => t('CSV'), 'video' => t('Video'));
+  $variables['limit_types'] = array('all' => t('All'), 'images' => t('Images'), 'pdf' => t('PDF'), 'text' => t('Text'), 'csv' => t('CSV'), 'audio' => t('Audio'), 'video' => t('Video'));
   // Results per Page
   $variables['results_per_page'] =  array('10', '15', '20', '25', '30');
   // Table
@@ -125,7 +125,23 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       'func' => 'si_exhibition_flexpaper',
       'type' => array('r-pdf', 'pdf'), // Icon, Label
       'class' => 'resources-pdf'
-    )
+    ),
+    'islandora:sp-audioCModel' => array(
+      'dsid' => array('OBJ'),
+			'view' => array('PROXY_MP3'),
+			'tn' => TRUE,
+      'func' => 'si_exhibition_ds',
+      'type' => array('r-csv', 'csv'), // Icon, Label
+      'class' => 'resources-audio'
+    ),
+    'islandora:sp_videoCModel' => array(
+      'dsid' => array('OBJ'),
+			'view' => array('MP4'),
+			'tn' => TRUE,
+      'func' => 'si_exhibition_ds',
+      'type' => array('r-csv', 'csv'), // Icon, Label
+      'class' => 'resources-video'
+    ),
   );
   /*
   print '<div style="padding:20px;">';
@@ -133,9 +149,10 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   print '</div>';
   var_dump(array_intersect_key($display_definitions, array_flip($resource['models'])));
   */
+ 
   $display = array_pop(array_intersect_key($display_definitions, array_flip($resource['models']))); // Assuming an object can't be two types of resources.
   if (empty($display)) return; //BBB
-  $display['url'] = (isset($display['url'])?$display['url']:'');
+	$display['url'] = (isset($display['url'])?$display['url']:'');
   $label = $resource['label'];
   // Metadata
   //$display_metadata_function = 'return si_exhibition_ds("' . $resource['pid'] . '", "METADATA")';
@@ -293,12 +310,15 @@ function theme_si_exhibition_child_concepts($vars){
  */
 function theme_si_exhibition_metadata_xmls($vars){
   $object = $vars['object'];
+  //error_log("\nIn theme_si_exhibition_metadata_xmls, id :".print_r($object->id,true),"3",DRUPAL_ROOT.'/'.drupal_get_path('module','si_exhibition')."/errorlog.txt");
   $rows = si_models_get_display_xmls($object->id);
   $datastream_content =  si_exhibition_meta_string_for_xslt($object);
+  error_log("\nIn theme_si_exhibition_metadata_xmls, si_exhibition_meta_string_for_xslt :".print_r($datastream_content,true),"3",DRUPAL_ROOT.'/'.drupal_get_path('module','si_exhibition')."/errorlog.txt");
   $output = $datastream_content;
   $doc = new DOMDocument();
   $xsl = new XSLTProcessor();
   $xsl_string = si_exhibition_xsl_string($object->id);
+  error_log("\nIn theme_si_exhibition_metadata_xmls, si_exhibition_xsl_string :".print_r($xsl_string,true),"3",DRUPAL_ROOT.'/'.drupal_get_path('module','si_exhibition')."/errorlog.txt");
   if ($xsl_string === FALSE){
     //No XSL string (bad news)
     drupal_set_message("Configuration problem, could not obtain XSL information from configured XSL provider. This usually means the exhibition server cannot contact the workbench server.", "error");
@@ -306,8 +326,11 @@ function theme_si_exhibition_metadata_xmls($vars){
   }
   $doc->loadXML(si_exhibition_xsl_string($object->id));
   $xsl->importStyleSheet($doc);
-  $docToLoad = ('<?xml version="1.0" encoding="UTF-8"?'.'>'.$output);
-  $doc->loadXML($docToLoad);
+  $docToLoad = $datastream_content;
+  if (strpos($datastream_content, '<?xml version=') === false) {
+    $docToLoad = ('<?xml version="1.0" encoding="UTF-8"?'.'>'.$datastream_content);
+  }  
+	$doc->loadXML($docToLoad);
   if (!empty($_GET['output'])){
 	  if ($_GET['output'] == 'xslSaved'){
 	    print $doc->saveXML();

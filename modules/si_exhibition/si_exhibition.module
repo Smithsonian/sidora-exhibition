@@ -1584,7 +1584,7 @@ function si_exhibition_get_datastream_as_json() {
   // List of viewable data streams directly from the URL
   $theme = array('TEXT' => 'si_exhibition_text_datastream', 'CSV' => 'si_exhibition_csv_datastream', 'METADATA' => 'si_exhibition_metadata', 'METADATA_XMLS' => 'si_exhibition_metadata_xmls');
   $repo = tuque_wrapper_get_repository_instance();
-  si_exhibition_debug('repo from si_exhibition_get_datastream_as_json');
+  //si_exhibition_debug('repo from si_exhibition_get_datastream_as_json');
   $object = $repo->getObject($pid); // If listed in the resources we know we already have access to it.
   $output = isset($theme[$dsid]) ? theme($theme[$dsid], array('object'=>$object)) : t('An Error Occured.');
   /*
@@ -1868,6 +1868,8 @@ function exhibition_resources_form($form, &$form_state){
       'images' => t('Images'),
       'pdf' => t('Digitized Text (pdf)'),
       'csv' => t('Tabular Datasets'),
+			'audio' => t('Audio'),
+			'video' => t('Video'),
     ),
   );
   $form['limit'] = array(

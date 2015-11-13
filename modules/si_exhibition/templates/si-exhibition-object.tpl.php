@@ -31,7 +31,7 @@ $object = $variables['object'];
    <div id="si-resources">
     <h2><?php print t('Resources'); ?></h2>
     <div id="si-resources-inner">
-      <?php print theme('si_exhibition_resources', $variables); ?>
+			<?php print theme('si_exhibition_resources', $variables); ?>
     </div>
   </div>
 </div>
