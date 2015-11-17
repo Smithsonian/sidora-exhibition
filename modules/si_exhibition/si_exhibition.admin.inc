@@ -16,6 +16,7 @@
  *   The drupal form definition.
  */
 function si_exhibition_admin_settings($form, &$form_state) {
+  module_load_include('inc', 'si_exhibition', 'includes/workbench_viewers.admin');
   $form = array(
     'si_exhibition_expose_block' => array(
       '#type' => 'select',
@@ -73,6 +74,7 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#description' => t('The Fedora Commons Repo location'),
     ),
   );
+  _sidora_admin_settings_add_viewer_configs($form);
   return system_settings_form($form);
 }
 

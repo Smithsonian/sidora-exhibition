@@ -96,7 +96,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     'si:imageCModel' => array(
       'dsid' => 'IMAGE',
       'view' => 'IMAGE',
-      'url' => 'IMAGE',
+      'url' => 'sidora_viewer',
       'tn' => TRUE,
       'func' => 'si_exhibition_ds',
       'type' => array('r-jpg', 'jpg'), // Icon, Label
@@ -105,7 +105,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     'si:generalImageCModel' => array(
       'dsid' => 'IMAGE',
       'view' => 'IMAGE',
-      'url' => 'IMAGE',
+      'url' => 'sidora_viewer',
       'tn' => TRUE,
       'func' => 'si_exhibition_ds',
       'type' => array('r-jpg', 'jpg'), // Icon, Label
@@ -114,13 +114,15 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     'si:datasetCModel' => array(
       'dsid' => array('OBJ','CSV'),
       'view' => array('OBJ','CSV'),
+      'url' => 'sidora_viewer',
       'func' => 'si_exhibition_ds',
       'type' => array('r-csv', 'csv'), // Icon, Label
       'class' => 'resources-csv'
     ),
     'si:fieldbookCModel' => array(
       'dsid' => 'OBJ',
-      'view' => 'OBJ.swf',
+      'view' => 'OBJ',
+      'url' => 'sidora_viewer',
       'tn' => TRUE,
       'func' => 'si_exhibition_flexpaper',
       'type' => array('r-pdf', 'pdf'), // Icon, Label
@@ -129,6 +131,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     'islandora:sp-audioCModel' => array(
       'dsid' => array('OBJ'),
 			'view' => array('PROXY_MP3'),
+      'url' => 'sidora_viewer',
 			'tn' => TRUE,
       'func' => 'si_exhibition_ds',
       'type' => array('r-csv', 'csv'), // Icon, Label
@@ -138,6 +141,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       'dsid' => array('OBJ'),
 			'view' => array('MP4'),
 			'tn' => TRUE,
+      'url' => 'sidora_viewer',
       'func' => 'si_exhibition_ds',
       'type' => array('r-csv', 'csv'), // Icon, Label
       'class' => 'resources-video'
@@ -310,15 +314,12 @@ function theme_si_exhibition_child_concepts($vars){
  */
 function theme_si_exhibition_metadata_xmls($vars){
   $object = $vars['object'];
-  //error_log("\nIn theme_si_exhibition_metadata_xmls, id :".print_r($object->id,true),"3",DRUPAL_ROOT.'/'.drupal_get_path('module','si_exhibition')."/errorlog.txt");
   $rows = si_models_get_display_xmls($object->id);
   $datastream_content =  si_exhibition_meta_string_for_xslt($object);
-  error_log("\nIn theme_si_exhibition_metadata_xmls, si_exhibition_meta_string_for_xslt :".print_r($datastream_content,true),"3",DRUPAL_ROOT.'/'.drupal_get_path('module','si_exhibition')."/errorlog.txt");
   $output = $datastream_content;
   $doc = new DOMDocument();
   $xsl = new XSLTProcessor();
   $xsl_string = si_exhibition_xsl_string($object->id);
-  error_log("\nIn theme_si_exhibition_metadata_xmls, si_exhibition_xsl_string :".print_r($xsl_string,true),"3",DRUPAL_ROOT.'/'.drupal_get_path('module','si_exhibition')."/errorlog.txt");
   if ($xsl_string === FALSE){
     //No XSL string (bad news)
     drupal_set_message("Configuration problem, could not obtain XSL information from configured XSL provider. This usually means the exhibition server cannot contact the workbench server.", "error");
