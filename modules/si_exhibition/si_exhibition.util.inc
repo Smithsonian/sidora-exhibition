@@ -465,3 +465,4 @@ function si_exhibition_get_csv_datastream_content(FedoraObject $object) {
 function si_exhibition_get_text_datastream_content(FedoraObject $object) {
   return si_exhibition_get_datastream_contents($object, 'TEXT');
 }
+

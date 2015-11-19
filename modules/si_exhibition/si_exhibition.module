@@ -4,6 +4,7 @@
  *
  * Implements hooks and callbacks for this module.
  */
+error_log("\nIn si_exhibition, ",DRUPAL_ROOT.'/'.drupal_get_path('module','si_exhibition')."/errorlog.txt");
 define('FLEXPAPER_VIEWER_PATH', 'sites/all/libraries/flexpaper/FlexPaperViewer.swf');
 
 define('SIDORA_EX_DUMP', FALSE);
@@ -21,6 +22,14 @@ function si_exhibition_menu() {
       'access arguments' => array('administer site configuration'),
       'file' => 'si_exhibition.admin.inc',
       'type' => MENU_NORMAL_ITEM,
+    ),
+    'admin/settings/exhibition' => array(
+      'description' => 'Configure the display of the Exhibition repository.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('si_exhibition_admin_settings'),
+      'access arguments' => array('administer site configuration'),
+      'file' => 'si_exhibition.admin.inc',
+      'type' => MENU_CALLBACK,
     ),
     'si/exhibition/datastream' => array(
       'description' => 'Fetch the datastream for the given object using ajax.',
@@ -1584,7 +1593,7 @@ function si_exhibition_get_datastream_as_json() {
   // List of viewable data streams directly from the URL
   $theme = array('TEXT' => 'si_exhibition_text_datastream', 'CSV' => 'si_exhibition_csv_datastream', 'METADATA' => 'si_exhibition_metadata', 'METADATA_XMLS' => 'si_exhibition_metadata_xmls');
   $repo = tuque_wrapper_get_repository_instance();
-  si_exhibition_debug('repo from si_exhibition_get_datastream_as_json');
+  //si_exhibition_debug('repo from si_exhibition_get_datastream_as_json');
   $object = $repo->getObject($pid); // If listed in the resources we know we already have access to it.
   $output = isset($theme[$dsid]) ? theme($theme[$dsid], array('object'=>$object)) : t('An Error Occured.');
   /*
@@ -1826,7 +1835,6 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array()){
  * hook_cron() to be run with the cron jobs, check fedora to see if there's new information to cache
  */
 function si_exhibition_cron(){
-  return;  //BBB
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $cron_check = si_exhibition_cron_cache(); 
   cache_clear_all('si_exhibition_cache_', 'cache', TRUE);  //Clear the main cache

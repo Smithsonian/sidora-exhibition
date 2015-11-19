@@ -194,13 +194,15 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   if (!empty($available_dsid)){ $display['dsid'] = $available_dsid;  }
 
   if (array_search($display['dsid'], $resource['datastreams']) !== FALSE) {
-    $download = l('Download', 'fedora/repository/' . $resource['pid'] . '/' . $display['dsid'], array('class'=> $display['class']));
-  }
-  $option_dropdown = '<div class="exhibition_js_dropdown" style="display:none;"><select class="exhibition_option_dd" id="exhibition_option_dd_'.substr($resource['pid'],3).'"><option value="choose">Choose...</option><option value="preview">Preview</option><option value="meta">View Metadata</option><option value="download">Download</option></select></div>';
-  $option_dropdown .= '<div class="regular-options">'.$download.$metadata;
+    //$download_datastream_function = 'return si_exhibition_get_obj_datastream_content("' . $resource['pid'] . '")';
+    $download = "<a href='#' onclick='{$download_datastream_function}'>Download</a>";
+		//$download = l('Download', 'fedora/download/' . $resource['pid'], array('class'=> $display['class']));
+	}
+  //$option_dropdown = '<div class="exhibition_js_dropdown" style="display:none;"><select class="exhibition_option_dd" id="exhibition_option_dd_'.substr($resource['pid'],3).'"><option value="choose">Choose...</option><option value="preview">Preview</option><option value="meta">View Metadata</option><option value="download">Download</option></select></div>';
+  $option_dropdown = '<div class="regular-options">'.$download.$metadata;
   $option_dropdown .= '<a href="#" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '" onclick="' . $display_datastream_function . '">Preview</a>';
   $option_dropdown .= '</div>';
-  $option_dropdown .= "\n".'<script>(function($){';
+  /*$option_dropdown .= "\n".'<script>(function($){';
   $jquery_item = '$("#exhibition_option_dd_'.substr($resource['pid'],3).'")';
   $option_dropdown .= $jquery_item.'.change(function(){';
   $option_dropdown .= "\n".'var val = '.$jquery_item.'.val();';
@@ -219,7 +221,7 @@ title: '".$resource['label'] ."',
   $option_dropdown .= ' window.open("'.url("fedora/repository/{$resource['pid']}/{$display['url']}").'","Download");';
   $option_dropdown .= '}';
   $option_dropdown .= '});';
-  $option_dropdown .= '})(jQuery);</script>';
+  $option_dropdown .= '})(jQuery);</script>';*/
   return array($view, '<span class="table-label">'.$label.'<span>', $option_dropdown); //$metadata, $type, $download);
 }
 
@@ -323,8 +325,11 @@ function theme_si_exhibition_metadata_xmls($vars){
   }
   $doc->loadXML(si_exhibition_xsl_string($object->id));
   $xsl->importStyleSheet($doc);
-  $docToLoad = ('<?xml version="1.0" encoding="UTF-8"?'.'>'.$output);
-  $doc->loadXML($docToLoad);
+  $docToLoad = $datastream_content;
+  if (strpos($datastream_content, '<?xml version=') === false) {
+    $docToLoad = ('<?xml version="1.0" encoding="UTF-8"?'.'>'.$datastream_content);
+  }  
+	$doc->loadXML($docToLoad);
   if (!empty($_GET['output'])){
 	  if ($_GET['output'] == 'xslSaved'){
 	    print $doc->saveXML();
