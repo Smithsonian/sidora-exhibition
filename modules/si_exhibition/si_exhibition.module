@@ -4,7 +4,6 @@
  *
  * Implements hooks and callbacks for this module.
  */
-error_log("\nIn si_exhibition, ",DRUPAL_ROOT.'/'.drupal_get_path('module','si_exhibition')."/errorlog.txt");
 define('FLEXPAPER_VIEWER_PATH', 'sites/all/libraries/flexpaper/FlexPaperViewer.swf');
 
 define('SIDORA_EX_DUMP', FALSE);
@@ -67,6 +66,13 @@ function si_exhibition_menu() {
     'fedora/repository' => array(
       'description' => 'Overrides the islandora call to a Fedora repository',
       'page callback' => 'si_exhibition',
+      'access callback' => true,
+      'type' => MENU_CALLBACK,
+    ),
+		'fedora/download/%' => array(
+      'description' => 'Overrides the islandora call to a Fedora repository',
+      'page callback' => 'si_exhibition_get_obj_datastream_content',
+			'page arguments' => array(2),
       'access callback' => true,
       'type' => MENU_CALLBACK,
     ),
@@ -1904,3 +1910,52 @@ function _si_exhibition_dump(&$var) {
     var_dump($var);
   }
 }
+function si_exhibition_get_obj_datastream_content($pid) {
+  $repo = tuque_wrapper_get_repository_instance();
+  $object = $repo->getObject($pid);
+  foreach($object as $dsid_loop=>$datastream_loop) {
+	  if ($dsid_loop == 'OBJ'){
+      $datastream = $datastream_loop;
+      $datastream_content = $datastream->content;
+		}	
+	}	
+  if (empty($datastream_content)){
+    print t('Datastream not found by that name');
+    drupal_exit();
+  }
+  //datastream_content is now set.  perform the output
+  $mime_type = (empty($datastream))?'text/xml':$datastream->mimeType;
+  header('Content-length: ' . strlen($datastream_content));
+    // Prevent adding on a duplicate extension.
+    $label = $datastream->label;
+    if (strtoupper($label) != 'OBJ'){
+		  $filename = $datastream->label;
+    }else{
+      $url_to_get = variable_get('si_exhibition_workbench_xsl', '') . 'file_extension/' . urlencode($pid);
+      $ch = curl_init();
+      $timeout = 60;
+      curl_setopt($ch, CURLOPT_URL, $url_to_get);
+      curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+      curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+      curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
+      curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
+      curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+      $data = curl_exec($ch);
+      if ($data === FALSE){
+        $curl_error_string = curl_error($ch);
+       // print_t('Could not obtain data from:'.$url_to_get);
+        print $curl_error_string.'<br/>'."\n";
+        $info = curl_getinfo($ch);
+        print_r($info);
+        curl_close($ch);
+        return;
+      }
+      curl_close($ch);
+      $extension = json_decode($data);
+			$filename = $pid.'_OBJ'.$extension;//get_suggest_filename($label, $mime_type);*/
+		}	
+    header("Content-type: $mime_type");
+    header("Content-Disposition: attachment; filename=\"$filename\"");
+    print $datastream_content;
+		drupal_exit();
+}		

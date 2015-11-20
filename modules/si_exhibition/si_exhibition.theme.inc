@@ -195,8 +195,8 @@ function _si_exhibition_get_resource_table_row(array $resource) {
 
   if (array_search($display['dsid'], $resource['datastreams']) !== FALSE) {
     //$download_datastream_function = 'return si_exhibition_get_obj_datastream_content("' . $resource['pid'] . '")';
-    $download = "<a href='#' onclick='{$download_datastream_function}'>Download</a>";
-		//$download = l('Download', 'fedora/download/' . $resource['pid'], array('class'=> $display['class']));
+    //$download = "<a href='#' onclick='{$download_datastream_function}'>Download</a>";
+		$download = l('Download', 'fedora/download/' . $resource['pid'], array('class'=> $display['class']));
 	}
   //$option_dropdown = '<div class="exhibition_js_dropdown" style="display:none;"><select class="exhibition_option_dd" id="exhibition_option_dd_'.substr($resource['pid'],3).'"><option value="choose">Choose...</option><option value="preview">Preview</option><option value="meta">View Metadata</option><option value="download">Download</option></select></div>';
   $option_dropdown = '<div class="regular-options">'.$download.$metadata;
