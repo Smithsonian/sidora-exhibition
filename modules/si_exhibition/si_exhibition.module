@@ -76,6 +76,12 @@ function si_exhibition_menu() {
       'access callback' => true,
       'type' => MENU_CALLBACK,
     ),
+    'forward_open_access' => array(
+      'description' => 'Forwards a call directly to the open_access workbench',
+      'page callback' => 'si_exhibition_forward_open_access',
+      'access callback' => true,
+      'type' => MENU_CALLBACK,
+    ),
   );
 }
 
@@ -292,7 +298,6 @@ function si_exhibition_block_view($delta='') {
     return $block;
   }
 }
-
 /*
  * Return if this exhibition should be shown
  */
@@ -359,11 +364,13 @@ function si_exhibition_preprocess_page(&$variables) {
       //logo is the image
       //site_slogan is under the name
       //site_name is the main name
-      if (array_key_exists('logo', $se)) $variables['logo'] = $se['logo']; else $variables['logo'] = '';
-      if (array_key_exists('title', $se)) $variables['site_name'] = $se['title']; else $variables['site_name'] = '';
-      //$variables['site_slogan'] = ' sitey slogany'.arg(2);
-      $variables['sidora_exhibition'] = $se;
-      $variables['primary_links_tree'] = drupal_render(menu_tree_output(menu_tree_all_data('main-menu')));
+      if (!empty($se)){
+        if (array_key_exists('logo', $se)) $variables['logo'] = $se['logo']; else $variables['logo'] = '';
+        if (array_key_exists('title', $se)) $variables['site_name'] = $se['title']; else $variables['site_name'] = '';
+        //$variables['site_slogan'] = ' sitey slogany'.arg(2);
+        $variables['sidora_exhibition'] = $se;
+        $variables['primary_links_tree'] = drupal_render(menu_tree_output(menu_tree_all_data('main-menu')));
+      }
     } catch(Exception $e) {
       print ('exception'.$e->getMessage().'  '.$e->getTraceAsString());//BBB
       exit();
@@ -378,6 +385,43 @@ function si_exhibition_preprocess_page(&$variables) {
 function si_exhibition($pid = NULL, $dsid = NULL) {
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $pid = isset($pid) ? $pid : variable_get('fedora_repository_pid', 'si:root');
+  $object = sidora_obj($pid);
+  drupal_add_css(drupal_get_path('module', 'si_exhibition') . '/css/si-exhibition.css');
+  $jstreepath = variable_get('sidora_js_lib_location_jstree', '');
+  drupal_add_css($jstreepath . 'themes/default/style.min.css', array('type' => 'external'));
+  if (variable_get('si_exhibition_anonymous_only', FALSE)){
+    if (!si_exhibition_check_view_permission($pid)){
+      watchdog('exhibition', 'si_exhibition_check_view_permission for:'.$pid.' was false');
+      return drupal_not_found();
+    }
+  }
+  if (!_si_show_exhibition()){
+    watchdog('exhibition', '_si_show_exhibition for:'.$pid.' was false');
+    return drupal_not_found();
+  }
+  //"Magic" value "sidora_viewer" will use the viewer settings
+  if ($dsid != NULL && !empty($object) && (!empty($object[$dsid]) || $dsid == 'sidora_viewer' )) {
+    //Here we know we "should" be able to see it
+    if ($dsid == 'sidora_viewer'){
+      si_exhibition_sidora_viewer($object);
+    }
+    else {
+      header("Content-Type: ".$object[$dsid]->mimetype);
+      print $object[$dsid]->content;
+    }
+    exit();
+    //return call_user_func_array('repository_page', func_get_args()); // Use the default datastream download code.
+  }
+  if (!empty($object)){
+    return theme('si_exhibition_object', array('object'=>$object));
+    exit();
+  }else{
+    print "not found";
+    exit();
+  }
+  
+}
+function sidora_obj($pid){
   $repo = tuque_wrapper_get_repository_instance();
   si_exhibition_debug('repo from si_exhibition');
   // Check if we can access the repository and the requested object.
@@ -418,34 +462,122 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     }
     exit();
   }
-  drupal_add_css(drupal_get_path('module', 'si_exhibition') . '/css/si-exhibition.css');
-  drupal_add_css(drupal_get_path('module', 'si_exhibition') . '/js/jstree/dist/themes/default/style.min.css');
-  if (variable_get('si_exhibition_anonymous_only', FALSE)){
-    if (!si_exhibition_check_view_permission($pid)){
-      watchdog('exhibition', 'si_exhibition_check_view_permission for:'.$pid.' was false');
-      return drupal_not_found();
+  return $object;
+}
+function si_exhibition_sidora_viewer($object){
+  global $base_url;
+  $pid = $object->id;
+  $xsl_config = si_exhibition_forward_direct_open_access(array('viewer_config', $object->id), FALSE, FALSE);
+  if (empty($xsl_config)) drupal_exit();
+  module_load_include('inc', 'si_exhibition', 'includes/workbench_viewers');
+  $viewer = $xsl_config->viewer_id;
+    switch ($viewer) {
+      case 'pdfjs':
+        drupal_goto(variable_get('sidora_pdf_js_location','').'?file='.$base_url.'/fedora/repository/'.$pid.'/OBJ');
+        drupal_exit();
+        break;
+      case 'IDS':
+        sidora_view_ids_iframe($pid, $dsid);
+        break;
+      case 'OpenSeaDragon':
+        sidora_view_openseadragon($pid, 'OBJ', '0');
+        break;
+      case 'PHPExcel':
+        sidora_tabular_view_phpexcelreader($pid,'OBJ');
+        break;
+      case 'JW Audio Player':
+        si_exhibition_jw_player($pid, 'PROXY_MP3/file_name_spoof.mp3');
+        break;
+      case 'JW Video Player':
+        si_exhibition_jw_player($pid, 'MP4/file_name_spoof.mp4');
+        break;
+      default:
+        echo $viewer;
+        break;
     }
-  }
-  if (!_si_show_exhibition()){
-    watchdog('exhibition', '_si_show_exhibition for:'.$pid.' was false');
-    return drupal_not_found();
-  }
-  if ($dsid != NULL && !empty($object) && !empty($object[$dsid])) {
-    //Moved this section down from the top 1/27/2015 BBB
-    //Here we know we "should" be able to see it
-    header("Content-Type: ".$object[$dsid]->mimetype);
-    print $object[$dsid]->content;
-    exit();
-    //return call_user_func_array('repository_page', func_get_args()); // Use the default datastream download code.
-  }
-  if (!empty($object)){
-    return theme('si_exhibition_object', array('object'=>$object));
-    exit();
-  }else{
-    print "not found";
-    exit();
-  }
   
+  exit();
+}
+function si_exhibition_jw_player($pid, $file_path){
+  if (strpos($pid, ':') !== FALSE) $pid = urlencode($pid);
+  global $base_url;
+  print '
+<script type="text/javascript" src="' . $base_url . '/' . libraries_get_path('jwplayer') . '/jwplayer.js"></script>
+<script type="text/javascript">
+document.addEventListener("DOMContentLoaded",function() {
+  jwplayer("mediaplayer").setup({
+    file: "'.$base_url.'/fedora/repository/'.$pid.'/'.$file_path.'",
+    image: "'.$base_url.'/fedora/repository/'.$pid.'/TN",
+    width: "480",
+    height: "270"
+  });
+});
+</script>
+<div style="width:100%;height:100%;">
+  <div style="background-color: #F2F2F2;  border: 1px solid #ddd;  -webkit-border-radius: 5px;  -moz-border-radius: 5px;  border-radius: 5px;  padding: 15px;  width: 480px;  max-width: 100%;margin: auto;/* height: 100px; */position: relative;top: 50%;transform: translateY(-50%);">
+    <div id="mediaplayer">Loading JW Player...</div>
+  </div>
+</div>
+';
+
+}
+/*
+ * The hook_menu call for open_access calls from the browser (javascript)
+ */
+function si_exhibition_forward_open_access($access_type, $pid = ''){
+  return si_exhibition_forward_direct_open_access( array( $access_type, $pid ) ); 
+}
+/*
+ * Used by the code to make direct calls to the workbench open_access protocol
+ */
+function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $exit = TRUE, $get_params = TRUE){
+  //Pull the info about the viewer for the object
+  
+  $url_to_get = variable_get('si_exhibition_workbench_xsl', '');
+  $url_to_get .= implode('/' , array_map('urlencode',$callback_args));
+  if ($get_params){
+    $url_to_get .= '?' . $_SERVER['QUERY_STRING'];
+  }
+  $ch = curl_init();
+  $timeout = 60;
+  curl_setopt($ch, CURLOPT_URL, $url_to_get);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+  $data = curl_exec($ch);
+
+  if ($data === FALSE){
+    $curl_error_string = curl_error($ch);
+    print 'Could not obtain data from:'.$url_to_get.'<br/>'."\n";
+    print $curl_error_string.'<br/>'."\n";
+    $info = curl_getinfo($ch);
+    print_r ($info);
+    curl_close($ch);
+    $se = array();
+    $se['error'] = $curl_error_string;
+    $_REQUEST['store_pid_config_'.$pid] = $se;
+    if ($exit) {
+      //var_dump($se);
+      drupal_exit();
+    }
+    return $se;
+  }
+  curl_close($ch);
+  if ($raw){
+    if ($exit) {
+      print ($data);
+      drupal_exit();
+    }
+    return $data;
+  }
+  $se = json_decode($data);
+  if ($exit) {
+    //var_dump($se);
+    drupal_exit();
+  }
+  return $se;
 }
 /*
  * Intended to determine if this should be viewable, but right now 
@@ -1651,10 +1783,11 @@ function si_exhibition_update_js(&$variables) {
 
   // Put a new jquery into core
   $modulepath = drupal_get_path('module', 'si_exhibition');
+  $jstreepath = variable_get('sidora_js_lib_location_jstree', '');
   drupal_add_js($modulepath.'/js/jquery-1.11.0.min.js');
   drupal_add_js($modulepath.'/js/jquery.browser.compat.js');
   drupal_add_js($modulepath.'/js/jquery.once.min.js');
-  drupal_add_js($modulepath.'/js/jstree/dist/jstree.min.js');
+  drupal_add_js($jstreepath.'jstree.min.js');
   drupal_add_js($modulepath.'/js/si_exhibition.js');
 }
 /*

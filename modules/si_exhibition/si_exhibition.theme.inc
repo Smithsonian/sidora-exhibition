@@ -96,7 +96,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     'si:imageCModel' => array(
       'dsid' => 'IMAGE',
       'view' => 'IMAGE',
-      'url' => 'IMAGE',
+      'url' => 'sidora_viewer',
       'tn' => TRUE,
       'func' => 'si_exhibition_ds',
       'type' => array('r-jpg', 'jpg'), // Icon, Label
@@ -105,7 +105,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     'si:generalImageCModel' => array(
       'dsid' => 'IMAGE',
       'view' => 'IMAGE',
-      'url' => 'IMAGE',
+      'url' => 'sidora_viewer',
       'tn' => TRUE,
       'func' => 'si_exhibition_ds',
       'type' => array('r-jpg', 'jpg'), // Icon, Label
@@ -114,13 +114,15 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     'si:datasetCModel' => array(
       'dsid' => array('OBJ','CSV'),
       'view' => array('OBJ','CSV'),
+      'url' => 'sidora_viewer',
       'func' => 'si_exhibition_ds',
       'type' => array('r-csv', 'csv'), // Icon, Label
       'class' => 'resources-csv'
     ),
     'si:fieldbookCModel' => array(
       'dsid' => 'OBJ',
-      'view' => 'OBJ.swf',
+      'view' => 'OBJ',
+      'url' => 'sidora_viewer',
       'tn' => TRUE,
       'func' => 'si_exhibition_flexpaper',
       'type' => array('r-pdf', 'pdf'), // Icon, Label
@@ -129,6 +131,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     'islandora:sp-audioCModel' => array(
       'dsid' => array('OBJ'),
 			'view' => array('PROXY_MP3'),
+      'url' => 'sidora_viewer',
 			'tn' => TRUE,
       'func' => 'si_exhibition_ds',
       'type' => array('r-csv', 'csv'), // Icon, Label
@@ -138,6 +141,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       'dsid' => array('OBJ'),
 			'view' => array('MP4'),
 			'tn' => TRUE,
+      'url' => 'sidora_viewer',
       'func' => 'si_exhibition_ds',
       'type' => array('r-csv', 'csv'), // Icon, Label
       'class' => 'resources-video'
