@@ -298,13 +298,26 @@ function si_exhibition_block_view($delta='') {
     return $block;
   }
 }
+function _si_current_pid_to_show() {
+  $pid_for_config = NULL;
+  $path = filter_input(INPUT_GET, 'path');
+  //if we have a path, make sure we can access that path
+  if (!empty($path)){
+    $path_list = explode(',',$path);
+    if (!empty($path_list[0])){
+      $pid_for_config = $path_list[0];
+    }
+  }
+  if (empty($pid_for_config)) return arg(2);
+  return $pid_for_config;
+}
 /*
  * Return if this exhibition should be shown
  */
 function _si_show_exhibition(){
+  $pid_on_url = arg(2); 
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $path = filter_input(INPUT_GET, 'path');
-  $pid_on_url = arg(2); 
 
   //Start cache check for return
   $cache_name = 'show_exhibition';
@@ -399,6 +412,16 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     watchdog('exhibition', '_si_show_exhibition for:'.$pid.' was false');
     return drupal_not_found();
   }
+
+  //Something should either be viewable via the xsl or downloadable with a file extension
+  $xsl_config = si_exhibition_forward_direct_open_access(array('xsl_config', $pid), TRUE, FALSE);
+  $file_extension = si_exhibition_forward_direct_open_access(array('file_extension', $pid), TRUE, FALSE);
+  if (empty($xsl_config) && empty($file_extension)){
+    drupal_not_found();
+    drupal_exit();
+  }
+
+
   //"Magic" value "sidora_viewer" will use the viewer settings
   if ($dsid != NULL && !empty($object) && (!empty($object[$dsid]) || $dsid == 'sidora_viewer' )) {
     //Here we know we "should" be able to see it
@@ -596,7 +619,11 @@ function si_exhibition_check_view_permission($object_pid) {
   if($object_pid == 'undefined' || !$object_pid) {
     $object_pid = variable_get('fedora_repository_pid', 'islandora:top');
   }
- return true; //BBB remove the xacml code??
+  
+  return true;
+  /*
+  XACML code unused
+
   $object = new Fedora_Item($object_pid);
   if(!$object->exists()) {
     return false;
@@ -626,6 +653,7 @@ function si_exhibition_check_view_permission($object_pid) {
     }
   }
   return false;
+  */
 }
 function si_exhibition_meta_string_for_xslt($object){
   $pid = $object->id;
@@ -1795,7 +1823,7 @@ function si_exhibition_update_js(&$variables) {
  * If it's not already stored for this call, go get it from the exhibition_config server
  * Will return NULL on errors and may set drupal error messages during the error processing
  */
-function si_exhibition_get_item_display_config($pid,$nav_to_pid){
+function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_messages = TRUE){
   $path = filter_input(INPUT_GET, 'path');
   $pid_on_url = arg(2); 
 
@@ -1849,7 +1877,9 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
   $my_json = $data;
   $se = json_decode($my_json,true);
   if ($se['error'] === TRUE){
-    drupal_set_message(t('This item is unavailable for view. You may attempt downloading.'), 'error', FALSE);
+    if ($print_drupal_messages) {
+      drupal_set_message(t('This item is unavailable for view. You may attempt downloading.'), 'error', FALSE);
+    }
     $to_return = null;
     return si_exhibition_cache($cache_name, $cache_index, $to_return);
   }

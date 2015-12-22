@@ -103,8 +103,8 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       'class' => 'resources-jpg'
     ),
     'si:generalImageCModel' => array(
-      'dsid' => 'IMAGE',
-      'view' => 'IMAGE',
+      'dsid' => 'OBJ',
+      'view' => 'OBJ',
       'url' => 'sidora_viewer',
       'tn' => TRUE,
       'func' => 'si_exhibition_ds',
@@ -130,17 +130,17 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     ),
     'islandora:sp-audioCModel' => array(
       'dsid' => array('OBJ'),
-			'view' => array('PROXY_MP3'),
+      'view' => array('PROXY_MP3'),
       'url' => 'sidora_viewer',
-			'tn' => TRUE,
+      'tn' => TRUE,
       'func' => 'si_exhibition_ds',
       'type' => array('r-csv', 'csv'), // Icon, Label
       'class' => 'resources-audio'
     ),
     'islandora:sp_videoCModel' => array(
       'dsid' => array('OBJ'),
-			'view' => array('MP4'),
-			'tn' => TRUE,
+      'view' => array('MP4'),
+      'tn' => TRUE,
       'url' => 'sidora_viewer',
       'func' => 'si_exhibition_ds',
       'type' => array('r-csv', 'csv'), // Icon, Label
@@ -155,8 +155,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   */
  
   $display = array_pop(array_intersect_key($display_definitions, array_flip($resource['models']))); // Assuming an object can't be two types of resources.
-  if (empty($display)) return; //BBB
-	$display['url'] = (isset($display['url'])?$display['url']:'');
+  $display['url'] = (isset($display['url'])?$display['url']:'');
   $label = $resource['label'];
   // Metadata
   //$display_metadata_function = 'return si_exhibition_ds("' . $resource['pid'] . '", "METADATA")';
@@ -171,7 +170,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   if (is_array($display['view'])) foreach($display['view'] as $curr_view) if (array_search($curr_view, $resource['datastreams']) !== FALSE) $available_view = $curr_view;
   if (!empty($available_view)){ $display['view'] = $available_view;  }
 
-  //print '<div>'; var_dump($display); print '</div>';
+  //print '<div>'; var_dump($display); var_dump ($resource['datastreams']); print '</div>';
   if (array_search($display['view'], $resource['datastreams']) !== FALSE) {
     $thumbnail_url = url("fedora/repository/{$resource['pid']}/TN");
     $view_preview = (isset($display['tn']) && array_search('TN', $resource['datastreams']) !== FALSE) ? "<img class='resource-tn' src='$thumbnail_url'/>" : '';
@@ -181,10 +180,12 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     }
     else {
       $display_datastream_function = "return {$display['func']}('{$resource['pid']}', '{$display['view']}');";
-      if (empty($view_preview))
+      if (empty($view_preview)) {
         $view = '<a href="#" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '" onclick="' . $display_datastream_function . '">Preview</a>';
-      else
+      } 
+      else {
         $view = '<a href="#" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '" onclick="' . $display_datastream_function . '">' . $view_preview . '</a>';
+      }
     }
   }
   // Type
@@ -316,6 +317,12 @@ function theme_si_exhibition_child_concepts($vars){
  */
 function theme_si_exhibition_metadata_xmls($vars){
   $object = $vars['object'];
+  if (variable_get('si_exhibition_anonymous_only', FALSE)){
+    if (!si_exhibition_check_view_permission($object->id)){
+      drupal_not_found();
+      return;
+    }
+  }
   $rows = si_models_get_display_xmls($object->id);
   $datastream_content =  si_exhibition_meta_string_for_xslt($object);
   $output = $datastream_content;
