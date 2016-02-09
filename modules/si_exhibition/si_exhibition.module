@@ -770,6 +770,11 @@ function si_exhibition_xsl_string($pid){
       $_REQUEST['store_pid_config_'.$pid] = $se;
       return FALSE;
     }
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    if($httpCode == 404) {
+      dsm("404'd: $url_to_get");
+      return FALSE;
+    }
     curl_close($ch);
     $my_xsl = $data;
 

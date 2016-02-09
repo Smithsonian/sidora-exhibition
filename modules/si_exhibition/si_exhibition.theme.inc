@@ -312,6 +312,23 @@ function theme_si_exhibition_child_concepts($vars){
   return $header . (empty($links) ? t('This item has no child concepts.') : theme('item_list', $item_list_array));
 }
 /*
+ * Error handler to eat the annoying XmlErrors that are not exceptions
+ * Returning false in function HandleXmlError() causes a fallback to the default error handler.
+ * Originally from: http://php.net/manual/en/domdocument.loadxml.php
+ */
+function HandleXmlError($errno, $errstr, $errfile, $errline)
+{
+  if ($errno==E_WARNING && (substr_count($errstr,"DOMDocument::loadXML()")>0))
+  {
+    throw new DOMException($errstr);
+  }
+  else 
+  {
+    return false;
+  }
+}
+
+/*
  * Returns the xml transformed by xsl, determined by the workbench if available, and the default xsl if not
  *
  */
@@ -334,7 +351,16 @@ function theme_si_exhibition_metadata_xmls($vars){
     drupal_set_message("Configuration problem, could not obtain XSL information from configured XSL provider. This usually means the exhibition server cannot contact the workbench server.", "error");
     return '';
   }
-  $doc->loadXML(si_exhibition_xsl_string($object->id));
+  try{
+    set_error_handler('HandleXmlError');
+    $doc->loadXML($xsl_string);
+    restore_error_handler();
+  }catch(Exception $e){
+    dsm($e);
+    dsm($xsl_string);
+    return '';
+  }
+
   $xsl->importStyleSheet($doc);
   $docToLoad = $datastream_content;
   if (strpos($datastream_content, '<?xml version=') === false) {
