@@ -89,6 +89,7 @@ function theme_si_exhibition_resource_table($vars){
  *   A drupal table row definition for using in the resources table.
  */
 function _si_exhibition_get_resource_table_row(array $resource) {
+  dsm($resource);
   if (empty($resource['models'])) {return '';}
   $display_datastream_function = '';
   // @todo use drupal behaviours and settings instead.
@@ -170,12 +171,10 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   if (is_array($display['view'])) foreach($display['view'] as $curr_view) if (array_search($curr_view, $resource['datastreams']) !== FALSE) $available_view = $curr_view;
   if (!empty($available_view)){ $display['view'] = $available_view;  }
 
-  //print '<div>'; var_dump($display); var_dump ($resource['datastreams']); print '</div>';
   if (array_search($display['view'], $resource['datastreams']) !== FALSE) {
     $thumbnail_url = url("fedora/repository/{$resource['pid']}/TN");
     $view_preview = (isset($display['tn']) && array_search('TN', $resource['datastreams']) !== FALSE) ? "<img class='resource-tn' src='$thumbnail_url'/>" : '';
     if (isset($display['url'])) {
-      //if (empty($view_preview)) $view_preview = t('View Metadata');
       $view = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '">' . $view_preview . '</a>';
     }
     else {
@@ -195,38 +194,24 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   $download = '';
 
   $available_dsid = '';
-  if (is_array($display['dsid'])) foreach($display['dsid'] as $curr_dsid) if (array_search($curr_dsid, $resource['datastreams']) !== FALSE) $available_dsid = $curr_dsid;
+  if (is_array($display['dsid'])){
+    foreach($display['dsid'] as $curr_dsid) {
+      if (array_search($curr_dsid, $resource['datastreams']) !== FALSE) {
+        $available_dsid = $curr_dsid;
+      }
+    }
+  }
   if (!empty($available_dsid)){ $display['dsid'] = $available_dsid;  }
 
   if (array_search($display['dsid'], $resource['datastreams']) !== FALSE) {
-    //$download_datastream_function = 'return si_exhibition_get_obj_datastream_content("' . $resource['pid'] . '")';
-    //$download = "<a href='#' onclick='{$download_datastream_function}'>Download</a>";
 		$download = l('Download', 'fedora/download/' . $resource['pid'], array('class'=> $display['class']));
 	}
-  //$option_dropdown = '<div class="exhibition_js_dropdown" style="display:none;"><select class="exhibition_option_dd" id="exhibition_option_dd_'.substr($resource['pid'],3).'"><option value="choose">Choose...</option><option value="preview">Preview</option><option value="meta">View Metadata</option><option value="download">Download</option></select></div>';
-  $option_dropdown = '<div class="regular-options">'.$download.$metadata;
-  $option_dropdown .= '<a href="#" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '" onclick="' . $display_datastream_function . '">Preview</a>';
+  $preview = '<a href="#" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '" onclick="' . $display_datastream_function . '">Preview</a>';
+  $option_dropdown = '<div class="regular-options">';
+  if ($resource['visibility']['allow_download']) $option_dropdown .= $download;
+  if ($resource['visibility']['show_meta'])      $option_dropdown .= $metadata;
+  if ($resource['visibility']['show_preview'])   $option_dropdown .= $preview;
   $option_dropdown .= '</div>';
-  /*$option_dropdown .= "\n".'<script>(function($){';
-  $jquery_item = '$("#exhibition_option_dd_'.substr($resource['pid'],3).'")';
-  $option_dropdown .= $jquery_item.'.change(function(){';
-  $option_dropdown .= "\n".'var val = '.$jquery_item.'.val();';
-  $option_dropdown .= "\n".'if (val  == "meta"){';
-  $option_dropdown .= $display_metadata_function;
-  $option_dropdown .= "\n".'}else if (val == "preview"){';
-  $option_dropdown .= "
- Shadowbox.open({
-content: '".url("fedora/repository/{$resource['pid']}/{$display['url']}")."',
-player: 'iframe',
-player: 'iframe',
-title: '".$resource['label'] ."',
-}); ";
-  //$option_dropdown .= $display_datastream_function;
-  $option_dropdown .= '}else if (val == "download"){';
-  $option_dropdown .= ' window.open("'.url("fedora/repository/{$resource['pid']}/{$display['url']}").'","Download");';
-  $option_dropdown .= '}';
-  $option_dropdown .= '});';
-  $option_dropdown .= '})(jQuery);</script>';*/
   return array($view, '<span class="table-label">'.$label.'<span>', $option_dropdown); //$metadata, $type, $download);
 }
 
@@ -339,6 +324,11 @@ function theme_si_exhibition_metadata_xmls($vars){
       drupal_not_found();
       return;
     }
+  }
+  $vis_obj = si_exhibition_get_visibility_object($object->id);
+  if (empty($vis_obj) || empty($vis_obj['show_meta'])) {
+    drupal_not_found();
+    drupal_exit();
   }
   $rows = si_models_get_display_xmls($object->id);
   $datastream_content =  si_exhibition_meta_string_for_xslt($object);

@@ -40,12 +40,25 @@ function si_exhibition_check_object_info_accessible(array $object_info) {
  * different visibility settings on their children between each occurrance.
  *
  */
-function si_exhibition_check_visibility($parent_pid_path, $to_check_pid) {
-  // Find where the path of the current concept from the exhibition root
+function si_exhibition_check_visibility($to_check_pid, $parent_pid_path = NULL) {
+  $vis_obj = si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path);
+  return ($vis_obj !== FALSE);
+}
+/**
+ * $parent_pid_path - String array of pids
+ *                  - the path from the root of the exhibition to the direct parent of the pid to check
+ * $to_check_pid - String of the pid to check for visibility
+ * This needs to be a full path because concepts can show up in the exhibition more than once and have
+ * different visibility settings on their children between each occurrance.
+ *
+ */
+function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = NULL) {
+  if ($parent_pid_path === NULL) {
+    // Find where the path of the current concept from the exhibition root
+    $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+  }
   // Go to that place in the visibility tree
-  // Return if the child pid is thereA
-  dsm($parent_pid_path);
-  dsm($to_check_pid);
+  // Return if the child pid is there
   if (!empty($parent_pid_path)){
     $vis_tree = si_exhibition_get_visibility_tree($parent_pid_path[0]);
     $curr_children = array($vis_tree);
@@ -70,7 +83,7 @@ function si_exhibition_check_visibility($parent_pid_path, $to_check_pid) {
     //visible
     foreach($curr_children as $curr_child){
       if ($curr_child['pid'] == $to_check_pid){
-        return TRUE;
+        return $curr_child;
       }
     }
     return FALSE;
@@ -435,7 +448,7 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
   }
   $parent_path = si_exhibition_get_pid_path_to_showing_concept();
   $resources = array_filter($resources, function($elem) use($parent_path){
-     return si_exhibition_check_visibility($parent_path, $elem['pid']);
+     return si_exhibition_check_visibility($elem['pid'],$parent_path);
   });
   $to_return = $resources;
   return si_exhibition_cache($cache_name, $cache_index, $to_return);
@@ -470,6 +483,8 @@ function si_exhibition_fill_out_resources(&$resources, $show, $limit = NULL, $of
           unset($resources[$key]);
         }
       }
+      $visibility_obj = si_exhibition_get_visibility_object($resource['pid']);
+      $resources[$key]['visibility'] = $visibility_obj;
     }
   }
 }

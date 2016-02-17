@@ -424,6 +424,24 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
 
   //"Magic" value "sidora_viewer" will use the viewer settings
   if ($dsid != NULL && !empty($object) && (!empty($object[$dsid]) || $dsid == 'sidora_viewer' )) {
+    //OBJ is special since that is to download the item, don't allow the OBJ datastream for
+    //the generic previews
+    if ($dsid == 'OBJ') {
+      drupal_not_found();
+      drupal_exit();
+    }
+
+    //All others that come here are the "previews"
+    require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
+    $vis_obj = si_exhibition_get_visibility_object($pid);
+    if (empty($vis_obj) || empty($vis_obj['show_preview'])) {
+
+      drupal_not_found();
+      var_dump($vis_obj);
+      drupal_exit();
+    }
+    
+
     //Here we know we "should" be able to see it
     if ($dsid == 'sidora_viewer'){
       si_exhibition_sidora_viewer($object);
@@ -437,7 +455,6 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
       print $object[$dsid]->content;
     }
     exit();
-    //return call_user_func_array('repository_page', func_get_args()); // Use the default datastream download code.
   }
   if (!empty($object)){
     return theme('si_exhibition_object', array('object'=>$object));
@@ -1805,22 +1822,17 @@ function si_exhibition_get_datastream_as_json() {
   $pid = $_GET['pid'];
   $dsid = $_GET['dsid'];
   // List of viewable data streams directly from the URL
-  $theme = array('TEXT' => 'si_exhibition_text_datastream', 'CSV' => 'si_exhibition_csv_datastream', 'METADATA' => 'si_exhibition_metadata', 'METADATA_XMLS' => 'si_exhibition_metadata_xmls');
+  $theme = array(
+    'TEXT' => 'si_exhibition_text_datastream', 
+    'CSV' => 'si_exhibition_csv_datastream', 
+    'METADATA' => 'si_exhibition_metadata', 
+    'METADATA_XMLS' => 'si_exhibition_metadata_xmls'
+  );
   $repo = tuque_wrapper_get_repository_instance();
-  //si_exhibition_debug('repo from si_exhibition_get_datastream_as_json');
   $object = $repo->getObject($pid); // If listed in the resources we know we already have access to it.
   $output = isset($theme[$dsid]) ? theme($theme[$dsid], array('object'=>$object)) : t('An Error Occured.');
-  /*
-  if ($dsid == 'METADATA_XMLS'){
-    header('Content-Type: text/xml');
-    print '<?xml version="1.0" encoding="UTF-8"?>
-<?xml-stylesheet type="text/xsl" href="xsl/metadata-display.xsl"?>
-';
-    print $output;
-  }else
-  */
-    print json_encode(array('output' => $output));
-  exit();
+  print json_encode(array('output' => $output));
+  drupal_exit();
 }
 
 /**
@@ -2080,17 +2092,42 @@ function si_exhibition_get_visibility_tree($pid) {
       "pid":"si:386976",
       "type":"concept",
       "children":[{
-        "pid":"si:389039"
+        "pid":"si:389039",
+        "type":"resource",
+        "show_meta":false,
+        "show_preview":true,
+        "allow_download":true
       },{
-        "pid":"BBBsi:389041"
+        "pid":"BBBsi:389041",
+        "type":"resource",
+        "show_meta":true,
+        "show_preview":true,
+        "allow_download":true
       },{
-        "pid":"BBBsi:389043"
+        "pid":"BBBsi:389043",
+        "type":"resource",
+        "show_meta":true,
+        "show_preview":true,
+        "allow_download":true
       },{
-        "pid":"si:388548"
+        "pid":"si:388548",
+        "type":"resource",
+        "show_meta":true,
+        "show_preview":false,
+        "allow_download":true
       },{
-        "pid":"si:389037"
+        "pid":"si:389037",
+        "type":"resource",
+        "show_meta":true,
+        "show_preview":true,
+        "allow_download":false
       },{
-        "pid":"si:388546"
+        "pid":"si:388546",
+        "name":"CSV filled with data",
+        "type":"resource",
+        "show_meta":true,
+        "show_preview":true,
+        "allow_download":true
       }]
     }]
   },{ 
@@ -2241,6 +2278,12 @@ function _si_exhibition_dump(&$var) {
   }
 }
 function si_exhibition_get_obj_datastream_content($pid) {
+  require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
+  $vis_obj = si_exhibition_get_visibility_object($pid);
+  if (empty($vis_obj) || empty($vis_obj['allow_download'])) {
+    drupal_not_found();
+    drupal_exit();
+  }
   $repo = tuque_wrapper_get_repository_instance();
   $object = $repo->getObject($pid);
   foreach($object as $dsid_loop=>$datastream_loop) {
