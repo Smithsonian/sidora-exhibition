@@ -194,11 +194,9 @@ function si_exhibition_get_child_concept_info_by_id($object_id) {
       return si_exhibition_check_view_permission($elem['pid']);
     });
   }
-  //var_dump ($children);
   $children = array_filter($children, 'si_exhibition_check_object_info_accessible');
 
   $to_return = $children;
-  //var_dump($to_return);
   return si_exhibition_cache($cache_name, $cache_index, $to_return);
 }
 
@@ -272,16 +270,6 @@ function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE,
       }
     }
   }else{
-    /*
-    if (!is_string($overwrite)){
-      if (empty($tnum)) $tnum = 0;
-      $tnum++;
-      print 'NOT STRING wbt';
-      var_dump($overwrite);
-      debug_print_backtrace();
-      if ($tnum > 1) exit();
-    }
-    */
     $data = array();
     if ($cache_info = cache_get($prefix.$cache_name, $cache_table_for_clearing)){
       $data = $cache_info->data;
@@ -367,12 +355,6 @@ function si_exhibition_get_pid_path_to_concept_by_url($url) {
   if ($url_info){
     $request_path = $url_info['path'];
     $fr_location = strpos($request_path,'/fedora/repository/');
-    /*
-    print "\r\n";
-    print "<hr/>";
-    print "\r\n";
-    var_dump($fr_location);
-    */
     if ($fr_location !== FALSE) {
       $final_pid = substr($request_path,$fr_location+19);
       if (si_exhibition_check_valid_pid($final_pid)) {
@@ -394,7 +376,6 @@ function si_exhibition_get_pid_path_to_concept_by_url($url) {
       } 
     }
   }
-  //var_dump($to_return);
   return $to_return;
 }
 /**

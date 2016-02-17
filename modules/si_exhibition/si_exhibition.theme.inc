@@ -89,7 +89,6 @@ function theme_si_exhibition_resource_table($vars){
  *   A drupal table row definition for using in the resources table.
  */
 function _si_exhibition_get_resource_table_row(array $resource) {
-  dsm($resource);
   if (empty($resource['models'])) {return '';}
   $display_datastream_function = '';
   // @todo use drupal behaviours and settings instead.

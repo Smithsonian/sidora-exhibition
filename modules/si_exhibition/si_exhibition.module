@@ -435,9 +435,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
     $vis_obj = si_exhibition_get_visibility_object($pid);
     if (empty($vis_obj) || empty($vis_obj['show_preview'])) {
-
       drupal_not_found();
-      var_dump($vis_obj);
       drupal_exit();
     }
     
@@ -603,7 +601,6 @@ function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $
     $se['error'] = $curl_error_string;
     $_REQUEST['store_pid_config_'.$pid] = $se;
     if ($exit) {
-      //var_dump($se);
       drupal_exit();
     }
     return $se;
@@ -626,7 +623,6 @@ function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $
   }
   $se = json_decode($data);
   if ($exit) {
-    //var_dump($se);
     drupal_exit();
   }
   return $se;
@@ -757,7 +753,7 @@ function si_exhibition_custom_url($cu) {
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   if ($cu == 'test')  {
     var_dump( si_exhibition_get_visibility_tree(''));
-    var_dump(si_exhibition_get_pid_path_to_showing_concept());//"/fedora/repository/si:showing?path=i:1,i:2,i:3"));
+    var_dump(si_exhibition_get_pid_path_to_showing_concept());
     print '<a href="./si:valid?path=si:1,h:2,y:3">go</a> ';
     print '<a href="./download">nogo</a>';
     drupal_exit();
@@ -1947,7 +1943,6 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
   $data = curl_exec($ch);
   
-  //echo 'si_exhibition.module: line 1534<br><pre>' . print_r($data, true) . '</pre>';
   $curl_error_string = ''; 
   if ($data === FALSE){
     $curl_error_string = curl_error($ch);
@@ -2146,7 +2141,6 @@ function si_exhibition_get_visibility_tree($pid) {
   }]
 }
 ';
-  //var_dump($vis_json);
   return json_decode($vis_json, TRUE);
 }
 /*
