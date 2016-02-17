@@ -591,6 +591,14 @@ function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $
     }
     return $se;
   }
+      ob_start();
+      print "Success on open access call\n";
+      var_dump($ch);
+      var_dump(curl_error($ch));
+      var_dump(curl_getinfo($ch));
+      $debug_result = ob_get_clean();
+      si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+
   curl_close($ch);
   if ($raw){
     if ($exit) {
@@ -691,6 +699,14 @@ function si_exhibition_meta_string_for_xslt($object){
       $_REQUEST['store_pid_config_'.$pid] = $se;
       return $se;
     }
+      ob_start();
+      print "Success on meta string for xslt\n";
+      var_dump($ch);
+      var_dump(curl_error($ch));
+      var_dump(curl_getinfo($ch));
+      $debug_result = ob_get_clean();
+      si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+
     curl_close($ch);
     $xsl_config = json_decode($data);
 
@@ -721,6 +737,14 @@ function si_exhibition_meta_string_for_xslt($object){
  *
  */
 function si_exhibition_custom_url($cu) {
+  require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
+  if ($cu == 'test')  {
+    var_dump( si_exhibition_get_visibility_tree(''));
+    var_dump(si_exhibition_get_pid_path_to_showing_concept());//"/fedora/repository/si:showing?path=i:1,i:2,i:3"));
+    print '<a href="./si:valid?path=si:1,h:2,y:3">go</a> ';
+    print '<a href="./download">nogo</a>';
+    drupal_exit();
+  }
   $url =
     variable_get('si_exhibition_data_url', '').
     'custom_url'.'/'.
@@ -772,9 +796,24 @@ function si_exhibition_xsl_string($pid){
     }
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     if($httpCode == 404) {
+      ob_start();
+      print "404 on call to get XSL\n";
+      var_dump($ch);
+      var_dump(curl_error($ch));
+      var_dump(curl_getinfo($ch));
+      $debug_result = ob_get_clean();
+      si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
       dsm("404'd: $url_to_get");
       return FALSE;
     }
+    ob_start();
+    print "Successful call to get XSL\n";
+    var_dump($ch);
+    var_dump(curl_error($ch));
+    var_dump(curl_getinfo($ch));
+    $debug_result = ob_get_clean();
+    si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+
     curl_close($ch);
     $my_xsl = $data;
 
@@ -1828,6 +1867,35 @@ function si_exhibition_update_js(&$variables) {
   drupal_add_js($modulepath.'/js/si_exhibition.js');
 }
 /*
+ * Add the ability to debug the curl requests
+ */
+function si_exhibition_sidora_debug($debug_string, $cgi = NULL) {
+  $debug_string .= microtime();
+  $sidora_debug = !empty($_GET['sidora_debug']);
+  if ($sidora_debug) $sidora_debug = $_GET['sidora_debug']; 
+  if ($cgi != NULL) {
+    if (!empty($_GET['sidora_filter_timing'])) {
+      $sidora_filter_timing = $_GET['sidora_filter_timing'];
+      if (!empty($cgi['starttransfer_time'])) {
+        if (floatval($sidora_filter_timing) > floatval($cgi['starttransfer_time'])) {
+         return;
+        }
+      }
+    }
+  }
+  if ($sidora_debug == 'screen') {
+    print $debug_string;
+  }
+  if ($sidora_debug == 'watchdog') {
+    if (function_exists('watchdog')) {
+      watchdog('SidoraTuque',$debug_string);
+    }else{
+      print "Watchdog does not exist\n$debug_string";
+    }
+  }
+}
+
+/*
  * Return the display configuration object
  * If it's not already stored for this call, go get it from the exhibition_config server
  * Will return NULL on errors and may set drupal error messages during the error processing
@@ -1868,7 +1936,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
   $data = curl_exec($ch);
   
   //echo 'si_exhibition.module: line 1534<br><pre>' . print_r($data, true) . '</pre>';
-  
+  $curl_error_string = ''; 
   if ($data === FALSE){
     $curl_error_string = curl_error($ch);
     print 'Could not obtain data from:'.$url_to_get.'<br/>'."\n";
@@ -1882,6 +1950,16 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
     $to_return = $se;
     return si_exhibition_cache($cache_name, $cache_index, $to_return);
   }
+    ob_start();
+    print "Successful call to Exhibition_config\n";
+    var_dump($ch);
+    var_dump($curl_error_string);
+    var_dump(curl_getinfo($ch));
+    $debug_result = ob_get_clean();
+    si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+
+
+
   curl_close($ch);
   $my_json = $data;
   $se = json_decode($my_json,true);
@@ -1953,6 +2031,86 @@ function si_exhibition_get_printable_tree($tree_pos, $current_path = ''){
   }
   $output .= '</li>';
   return $output;
+}
+/**
+ * Return an associative array of the visibility for the input pid
+ * The array is similar to this example:
+{
+  'pid':'si-user:126',
+  'label':'randerson6',
+  'type':'concept',
+  'show_meta':true,
+  'children':[{
+    'pid':'si:12345',
+    'name':'Image 1',
+    'type':'resource',
+    'show_meta':false,
+    'show_preview':true,
+    'allow_download':false
+  },{
+    'pid':'si:12346',
+    'name':'Incomplete folder, will hold more info later',
+    'type':'concept',
+    'show_meta':false,
+    'children':[{
+      'pid':'si:12347',
+      'name':'CSV filled with data',
+      'type':'resource',
+      'show_meta':true,
+      'show_preview':true,
+      'allow_download':true
+    }]
+  }]
+}
+
+ */
+function si_exhibition_get_visibility_tree($pid) {
+  $vis_json = '
+{
+  "pid":"si:365717",
+  "label":"randerson6",
+  "type":"concept",
+  "show_meta":true,
+  "children":[{
+    "pid":"si:386769",
+    "name":"Image 1",
+    "type":"concept",
+    "show_meta":false,
+    "children":[{
+      "pid":"si:386976",
+      "type":"concept",
+      "children":[{
+        "pid":"si:389039"
+      },{
+        "pid":"BBBsi:389041"
+      },{
+        "pid":"BBBsi:389043"
+      },{
+        "pid":"si:388548"
+      },{
+        "pid":"si:389037"
+      },{
+        "pid":"si:388546"
+      }]
+    }]
+  },{ 
+    "pid":"si:12346",
+    "name":"Incomplete folder, will hold more info later",
+    "type":"concept",
+    "show_meta":false,
+    "children":[{
+      "pid":"si:12347",
+      "name":"CSV filled with data",
+      "type":"resource",
+      "show_meta":true,
+      "show_preview":true,
+      "allow_download":true
+    }]
+  }]
+}
+';
+  //var_dump($vis_json);
+  return json_decode($vis_json, TRUE);
 }
 /*
  * return the php object representing the fedora tree
@@ -2114,6 +2272,14 @@ function si_exhibition_get_obj_datastream_content($pid) {
       curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
       $data = curl_exec($ch);
       if ($data === FALSE){
+        ob_start();
+        print "Error on file extension call\n";
+        var_dump($ch);
+        var_dump($curl_errori($ch));
+        var_dump(curl_getinfo($ch));
+        $debug_result = ob_get_clean();
+        si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+
         $curl_error_string = curl_error($ch);
        // print_t('Could not obtain data from:'.$url_to_get);
         print $curl_error_string.'<br/>'."\n";
@@ -2122,7 +2288,15 @@ function si_exhibition_get_obj_datastream_content($pid) {
         curl_close($ch);
         return;
       }
+      ob_start();
+      print "Success on file extension call\n";
+      var_dump($ch);
+      var_dump(curl_error($ch));
+      var_dump(curl_getinfo($ch));
+      $debug_result = ob_get_clean();
+      si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
       curl_close($ch);
+
       $extension = json_decode($data);
 			$filename = $pid.'_OBJ'.$extension;//get_suggest_filename($label, $mime_type);*/
 		}	

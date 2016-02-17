@@ -16,8 +16,12 @@
  *  TRUE if accessible FALSE otherwise.
  */
 function si_exhibition_check_object_info_accessible(array $object_info) {
-  //BBB Until we are different about permissions, assume the user can access it
   return TRUE;
+  //Until we are different about permissions, assume the user can access it
+  /* 
+  Below will check if user can access the object.  In general we will not want to check every object
+     so checking all the resources shouldn't happen
+  */
   $repo = tuque_wrapper_get_repository_instance();
   si_exhibition_debug('repo from si_exhibition_check_object_info_accessible');
   try {
@@ -28,9 +32,54 @@ function si_exhibition_check_object_info_accessible(array $object_info) {
   }
   return TRUE;
 }
+/**
+ * $parent_pid_path - String array of pids
+ *                  - the path from the root of the exhibition to the direct parent of the pid to check
+ * $to_check_pid - String of the pid to check for visibility
+ * This needs to be a full path because concepts can show up in the exhibition more than once and have
+ * different visibility settings on their children between each occurrance.
+ *
+ */
+function si_exhibition_check_visibility($parent_pid_path, $to_check_pid) {
+  // Find where the path of the current concept from the exhibition root
+  // Go to that place in the visibility tree
+  // Return if the child pid is thereA
+  dsm($parent_pid_path);
+  dsm($to_check_pid);
+  if (!empty($parent_pid_path)){
+    $vis_tree = si_exhibition_get_visibility_tree($parent_pid_path[0]);
+    $curr_children = array($vis_tree);
+    foreach($parent_pid_path as $curr_pid){
+      $found_next_child = FALSE;
+      $next_children = NULL;
+      foreach($curr_children as $curr_child) {
+        if ($curr_child['pid'] == $curr_pid) {
+          $found_next_child = TRUE;
+          $next_children = $curr_child['children'];
+        }
+      }
+      if ($found_next_child) {
+        $curr_children = $next_children;
+      }
+      else {
+        return FALSE;
+      }
+    }
+    //If it's made it here, then it didn't return false when attempting to go down the wrong path
+    //So the object that is located in $curr_children will hold all the valid objects that will be
+    //visible
+    foreach($curr_children as $curr_child){
+      if ($curr_child['pid'] == $to_check_pid){
+        return TRUE;
+      }
+    }
+    return FALSE;
+  }
+  return FALSE;
+}
 /*
-* For exhibitions, hides parents that aren't supposed to be shown, only the parents that should be in the current exhibition path
-*
+* For exhibitions, hide parents that aren't supposed to be shown, only the parents that should be in the current exhibition path
+* Only used in the si_exhibition_get_parent_info function
 */
 function si_exhibition_check_parent_in_tree(array $object_info, $tree_pid) {
   $tree_pid_list = array();
@@ -41,6 +90,9 @@ function si_exhibition_check_parent_in_tree(array $object_info, $tree_pid) {
 
 /**
  * Fetchs some information about the given object's parents.
+ *
+ * As of 2016/02/15 this is only used when the exhibition is not in tree mode in order to show the parents in
+ * the navigation
  *
  * @param FedoraObject $object
  *   The object who's parents info will be returned.
@@ -130,7 +182,9 @@ function si_exhibition_get_child_concept_info_by_id($object_id) {
     });
   }
   //var_dump ($children);
-  $to_return = array_filter($children, 'si_exhibition_check_object_info_accessible');
+  $children = array_filter($children, 'si_exhibition_check_object_info_accessible');
+
+  $to_return = $children;
   //var_dump($to_return);
   return si_exhibition_cache($cache_name, $cache_index, $to_return);
 }
@@ -258,6 +312,78 @@ function si_exhibition_cron_cache($function_name = FALSE, $arguments = FALSE){
   if (!in_array($arguments, $current_cron_cache[$function_name])) $current_cron_cache[$function_name][] = $arguments;
   si_exhibition_cache('cron_check',$function_name, $current_cron_cache[$function_name], TRUE);
 }
+/*
+ * Retrieve a path from the exhibition root to the current concept pid
+ *
+ * $url - optional parameter to give a path based on a specified url
+ *        If empty or omitted, will attempt the current URL
+ *        If current URL is not a valid concept display, will attempt referrer URL
+ * Returns an array of pids that represent the path from the exhibition root to the currently displaying concept.
+ *     The final entry in the array will be the currently showing concept
+ *     If cannot get a proper path, will return an empty array
+ * 
+ */
+function si_exhibition_get_pid_path_to_showing_concept($url = NULL) {
+  if (!empty($url)) {
+    return si_exhibition_get_pid_path_to_concept_by_url($url);
+  }
+  $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['REQUEST_URI']);
+  if (!empty($pid_path)) {
+    return $pid_path;
+  }
+  else {
+    return si_exhibition_get_pid_path_to_concept_by_url($_SERVER['HTTP_REFERER']);
+  }
+}
+/*
+ * Return whether a string has the possibility of being a pid
+ */
+function si_exhibition_check_valid_pid($pid) {
+      //Check that it's a valid pid: https://wiki.duraspace.org/display/FEDORA34/Fedora+Identifiers
+  return (preg_match('/^([A-Za-z0-9]|-|\.)+:(([A-Za-z0-9])|-|\.|~|_|(%[0-9A-F]{2}))+$/',$pid) == 1);
+}
+/*
+ * Breaks the URL up to return a path to the concept based on the following:
+ * <server>/fedora/repository/<current_concept_pid>?<any request vars>path=<CSV_of_pid_path_starting_at_exhibition_root><any additional request vars>
+ * 
+ * Return an array of exhibition root to showing concept or empty array
+ */
+function si_exhibition_get_pid_path_to_concept_by_url($url) {
+  $to_return = array();
+  $url_info = parse_url($url);
+  if ($url_info){
+    $request_path = $url_info['path'];
+    $fr_location = strpos($request_path,'/fedora/repository/');
+    /*
+    print "\r\n";
+    print "<hr/>";
+    print "\r\n";
+    var_dump($fr_location);
+    */
+    if ($fr_location !== FALSE) {
+      $final_pid = substr($request_path,$fr_location+19);
+      if (si_exhibition_check_valid_pid($final_pid)) {
+        parse_str($url_info['query'],$query_holder);
+        if (array_key_exists('path',$query_holder)){
+          //path=<blank> is valid
+          if (!empty($query_holder['path'])){
+            $check_pid_path = explode(',',$query_holder['path']);
+            foreach($check_pid_path as $check_pid) {
+              if (!si_exhibition_check_valid_pid($check_pid)){
+                //print 'Invalid pid:'.$check_pid;
+                return $to_return; //Invalid pid in path
+              }
+            }
+            $to_return = $check_pid_path;
+          }
+        }
+        $to_return[] = $final_pid;
+      } 
+    }
+  }
+  //var_dump($to_return);
+  return $to_return;
+}
 /**
  * Fetchs some information about the given object's child resources.
  *
@@ -305,11 +431,23 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
 		$results = $repo->ri->itqlQuery($query);
     $resources = array_map(function($o) { return array('pid' => $o['o']['value'], 'label' => $o['t']['value']); }, $results);
     // @todo replace the checks for each objects existance once we have the appropriate information in the rels to determine if its accessible.
-    //$resources =  array_filter($resources, 'si_exhibition_check_object_info_accessible'); //BBB Security changes will necessitate this being used
+    $resources =  array_filter($resources, 'si_exhibition_check_object_info_accessible'); //BBB Security changes will necessitate this being used
   }
+  $parent_path = si_exhibition_get_pid_path_to_showing_concept();
+  $resources = array_filter($resources, function($elem) use($parent_path){
+     return si_exhibition_check_visibility($parent_path, $elem['pid']);
+  });
   $to_return = $resources;
   return si_exhibition_cache($cache_name, $cache_index, $to_return);
 }
+/*
+ * Used to fill out the information of the specific resources that will be shown on screen
+ * The resources should already be filtered and visible
+ * $resources - array of resources which minimally each element has ['pid']
+ * $show - unused
+ * $limit - how many to show out of the $resources array
+ * $offset - first element to fill information for
+ */
 function si_exhibition_fill_out_resources(&$resources, $show, $limit = NULL, $offset = NULL){
   if (empty($limit)) $limit = sizeof($resources);
   if (empty($offset)) $offset = 0;
