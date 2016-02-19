@@ -61,14 +61,17 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
   // Return if the child pid is there
   if (!empty($parent_pid_path)){
     $vis_tree = si_exhibition_get_visibility_tree($parent_pid_path[0]);
+    //dsm($vis_tree);
     $curr_children = array($vis_tree);
     foreach($parent_pid_path as $curr_pid){
       $found_next_child = FALSE;
       $next_children = NULL;
+      $curr_parent = NULL;
       foreach($curr_children as $curr_child) {
         if ($curr_child['pid'] == $curr_pid) {
           $found_next_child = TRUE;
           $next_children = $curr_child['children'];
+          $curr_parent = $curr_child;
         }
       }
       if ($found_next_child) {
@@ -78,6 +81,10 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
         return FALSE;
       }
     }
+
+    //If we're looking for a concept then we should have ended up at the concept
+    if ($curr_parent['pid'] == $to_check_pid) return $curr_parent;//array('show_meta'=>TRUE);//$curr_parent;
+    
     //If it's made it here, then it didn't return false when attempting to go down the wrong path
     //So the object that is located in $curr_children will hold all the valid objects that will be
     //visible
@@ -87,6 +94,15 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
       }
     }
     return FALSE;
+  }
+  else {
+    //The parent path is empty, so we are looking for the root pid to match the checking_pid
+    $vis_tree = si_exhibition_get_visibility_tree($to_check_pid);
+    if (!empty($vis_tree) && !empty($vis_tree['pid'])){
+      if ($vis_tree['pid'] == $to_check_pid) {
+        return $vis_tree;
+      }
+    }
   }
   return FALSE;
 }
@@ -107,17 +123,17 @@ function si_exhibition_check_parent_in_tree(array $object_info, $tree_pid) {
  * As of 2016/02/15 this is only used when the exhibition is not in tree mode in order to show the parents in
  * the navigation
  *
- * @param FedoraObject $object
- *   The object who's parents info will be returned.
+ * @param string $pid
+ *   The pid of the object who's parents info will be returned.
  *
  * @return array
  *   An array of array's containing the following key value pairs for each parent of the given object:
  *    pid, label
  */
-function si_exhibition_get_parent_info(FedoraObject $object, $skipNonTreeParents = false) {
+function si_exhibition_get_parent_info_by_id($pid, $skipNonTreeParents = false) {
   $repo = tuque_wrapper_get_repository_instance();
-  si_exhibition_debug('repo from si_exhibition_get_parent_info');
-  $query = si_exhibition_generate_parent_concept_query($object->id);
+  si_exhibition_debug('repo from si_exhibition_get_parent_info_by_id');
+  $query = si_exhibition_generate_parent_concept_query($pid);
   $results = $repo->ri->itqlQuery($query);
   $parents = array_map(function($o) {
     return array('pid' => $o['o']['value'], 'label' => $o['t']['value']); 
@@ -125,7 +141,7 @@ function si_exhibition_get_parent_info(FedoraObject $object, $skipNonTreeParents
   
   // @todo replace the checks for each objects existance once we have the appropriate information in the rels to determine if its accessible.
   if ($skipNonTreeParents) {
-    $parents = array_filter($parents, function($elem) use ($object){
+    $parents = array_filter($parents, function($elem){
       $path = (isset($_GET['path']) ? $_GET['path'] : '');
       if (!$path) {
         return false;
@@ -164,16 +180,13 @@ function si_exhibition_generate_parent_concept_query($pid) {
 /**
  * Fetchs some information about the given object's child concepts.
  *
- * @param FedoraObject $object
- *   The parent object who's child concept info will be returned.
+ * @param object_id
+ *   Pid of the parent object who's child concept info will be returned.
  *
  * @return array
  *   An array of array's containing the following key value pairs for each child concpet of the given object:
  *    pid, label
  */
-function si_exhibition_get_child_concept_info(FedoraObject $object) {
-  return si_exhibition_get_child_concept_info_by_id($object->id);
-}
 function si_exhibition_get_child_concept_info_by_id($object_id) {
   //Start cache check for return
   $cache_name = 'child_concept_info';
@@ -358,15 +371,17 @@ function si_exhibition_get_pid_path_to_concept_by_url($url) {
     if ($fr_location !== FALSE) {
       $final_pid = substr($request_path,$fr_location+19);
       if (si_exhibition_check_valid_pid($final_pid)) {
-        parse_str($url_info['query'],$query_holder);
-        if (array_key_exists('path',$query_holder)){
-          //path=<blank> is valid
-          if (!empty($query_holder['path'])){
-            $check_pid_path = explode(',',$query_holder['path']);
-            foreach($check_pid_path as $check_pid) {
-              if (!si_exhibition_check_valid_pid($check_pid)){
-                //print 'Invalid pid:'.$check_pid;
-                return $to_return; //Invalid pid in path
+        if (!empty($url_info['query'])) {
+          parse_str($url_info['query'],$query_holder);
+          if (array_key_exists('path',$query_holder)){
+            //path=<blank> is valid
+            if (!empty($query_holder['path'])){
+              $check_pid_path = explode(',',$query_holder['path']);
+              foreach($check_pid_path as $check_pid) {
+                if (!si_exhibition_check_valid_pid($check_pid)){
+                  //print 'Invalid pid:'.$check_pid;
+                  return $to_return; //Invalid pid in path
+                }
               }
             }
             $to_return = $check_pid_path;
@@ -400,6 +415,7 @@ function si_exhibition_get_child_resource_info(FedoraObject $object, $type = 'al
   return si_exhibition_get_child_resource_info_by_id($object->id, $type, $sort, $limit, $offset);
 }
 function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', $sort = 'asc', $limit = NULL, $offset = NULL) {
+
   //Start cache check for return
   $cache_name = 'child_resource_info';
   $cache_index = $object_id.'_'.$type.'_'.$sort.'_'.$limit.'_'.$offset;
@@ -428,8 +444,20 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
     $resources =  array_filter($resources, 'si_exhibition_check_object_info_accessible'); //BBB Security changes will necessitate this being used
   }
   $parent_path = si_exhibition_get_pid_path_to_showing_concept();
-  $resources = array_filter($resources, function($elem) use($parent_path){
-     return si_exhibition_check_visibility($elem['pid'],$parent_path);
+  array_pop($parent_path); //Remove the current concept from the "parents" list
+  $vis_obj = si_exhibition_get_visibility_object($object_id, $parent_path); //Get the visibility of the current concept
+  $visible_child_list = array();
+  if (!empty($vis_obj) && !empty($vis_obj['children'])) {
+    //Fill up the list of items that the current concept has as visible children
+    foreach($vis_obj['children'] as $child_vis_obj) {
+      if (!empty($child_vis_obj['pid'])) {
+        $visible_child_list[] = $child_vis_obj['pid'];
+      }
+    }
+  }
+  //Only return resources that should be visible
+  $resources = array_filter($resources, function($elem) use($visible_child_list){
+     return in_array($elem['pid'],$visible_child_list);
   });
   $to_return = $resources;
   return si_exhibition_cache($cache_name, $cache_index, $to_return);
@@ -516,29 +544,6 @@ function si_exhibition_generate_child_resource_query($pid, array $resource_types
 */
 
 /**
- * Transforms the given CSV file to an array.
- *
- * @param string $file_path
- *   The path to the file to transform.
- *
- * @return array
- *   An array of array's where each row in the csv file corresponds to a single array of values in the returned array.
- */
-function si_exhibition_transform_csv_file_to_array($file_path) {
-  /**
-   * parseCSV could be an option in the future: http://code.google.com/p/parsecsv-for-php/
-   */
-  $rows = array();
-  if (($file = fopen($file_path, "r")) !== FALSE) {
-    while (($row = fgetcsv($file, 100000, ",")) !== FALSE) {
-      $rows[] = $row;
-    }
-    fclose($file);
-  }
-  return $rows;
-}
-
-/**
  * Fetches the get paramters to configure the pager.
  *
  * @return array
@@ -571,32 +576,5 @@ function si_exhibition_get_datastream_contents(FedoraObject $object, $dsid) {
     return $repo->api->a->getDatastreamDissemination($object->id, $dsid, NULL); // Work around for bug in Tuque API: ISLANDORA-752
   }
   return '';
-}
-
-/**
- * Fetchs the given objects CSV datastream contents.
- *
- * @param string $pid
- *   The PID of the object.
- *
- * @return string
- *   The datastream's contents if successful, an empty string otherwise.
- */
-function si_exhibition_get_csv_datastream_content(FedoraObject $object) {
-  // @todo combined the various csv datastreams into one.
-  return si_exhibition_get_datastream_contents($object, 'CSV');
-}
-
-/**
- * Fetchs the given objects TEXT datastream contents.
- *
- * @param string $pid
- *   The PID of the object.
- *
- * @return string
- *   The datastream's contents if successful, an empty string otherwise.
- */
-function si_exhibition_get_text_datastream_content(FedoraObject $object) {
-  return si_exhibition_get_datastream_contents($object, 'TEXT');
 }
 

@@ -262,6 +262,7 @@ function si_exhibition_block_view($delta='') {
           'subject' => t('SI Navigation'),
           'content' => theme('si_exhibition_navigation', array('object'=>$object)),
         );
+        dsm("seu_nav");
         break;
       case "seu_parent":
         $block = array(
@@ -405,11 +406,13 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
   if (variable_get('si_exhibition_anonymous_only', FALSE)){
     if (!si_exhibition_check_view_permission($pid)){
       watchdog('exhibition', 'si_exhibition_check_view_permission for:'.$pid.' was false');
+      dsm('BBB view permission false');
       return drupal_not_found();
     }
   }
   if (!_si_show_exhibition()){
     watchdog('exhibition', '_si_show_exhibition for:'.$pid.' was false');
+    dsm('BBB show exhibition explicitly false');
     return drupal_not_found();
   }
 
@@ -417,6 +420,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
   $xsl_config = si_exhibition_forward_direct_open_access(array('xsl_config', $pid), TRUE, FALSE);
   $file_extension = si_exhibition_forward_direct_open_access(array('file_extension', $pid), TRUE, FALSE);
   if (empty($xsl_config) && empty($file_extension)){
+    dsm('BBB xsl_config or file_extention empty');
     drupal_not_found();
     drupal_exit();
   }
@@ -427,6 +431,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     //OBJ is special since that is to download the item, don't allow the OBJ datastream for
     //the generic previews
     if ($dsid == 'OBJ') {
+      dsm('BBB Not allowed to use viewer directly on OBJ datastream');
       drupal_not_found();
       drupal_exit();
     }
@@ -435,6 +440,8 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
     $vis_obj = si_exhibition_get_visibility_object($pid);
     if (empty($vis_obj) || empty($vis_obj['show_preview'])) {
+      dsm('BBB visibility object empty or show_preview was empty');
+      dsm($vis_obj);
       drupal_not_found();
       drupal_exit();
     }
@@ -479,6 +486,7 @@ function sidora_obj($pid){
           drupal_set_message(t('The Fedora repository server is currently unavailable. Please contact the site administrator.'), 'error', FALSE);
         }
         watchdog('exhibition', '404 error getting pid:'.$pid.'.');
+        dsm('BBB Could not reach Fedora');
         drupal_not_found();
         break;
       case '401':
@@ -499,6 +507,7 @@ function sidora_obj($pid){
           '%line' => $caller['line']
         );
         watchdog('islandora', $message, $variables, WATCHDOG_ERROR, NULL);
+        dsm('BBB Islandora error');
         drupal_not_found();
         break;
     }
@@ -680,8 +689,7 @@ function si_exhibition_check_view_permission($object_pid) {
   return false;
   */
 }
-function si_exhibition_meta_string_for_xslt($object){
-  $pid = $object->id;
+function si_exhibition_meta_string_for_xslt_by_id($pid){
   $xsl_config = '';
   if (!empty($pid)){
     $url_to_get =
@@ -729,6 +737,7 @@ function si_exhibition_meta_string_for_xslt($object){
     $specific_meta = $xsl_config->dsid;
   }
   $datastream_content = '';
+  $object = sidora_obj($pid);
   if (empty($specific_meta)){
     foreach($object as $dsid_loop=>$datastream_loop){
       //strip off the <?xml directives if it has any and remove binary data
@@ -1819,8 +1828,6 @@ function si_exhibition_get_datastream_as_json() {
   $dsid = $_GET['dsid'];
   // List of viewable data streams directly from the URL
   $theme = array(
-    'TEXT' => 'si_exhibition_text_datastream', 
-    'CSV' => 'si_exhibition_csv_datastream', 
     'METADATA' => 'si_exhibition_metadata', 
     'METADATA_XMLS' => 'si_exhibition_metadata_xmls'
   );
@@ -1978,7 +1985,6 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
     return si_exhibition_cache($cache_name, $cache_index, $to_return);
   }
   if (isset($se['nav_type']) && $se['nav_type'] == 'tree'){
-    $block = module_invoke('si_exhibition', 'block_view', 'seu_nav');
     //See if the tree should start on the current node or if there is a path
     //if we have a path, make sure we can access that path
     $tree = NULL;
@@ -1993,6 +1999,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
         $tree = _si_exhibition_get_pid_tree($path_list[0], null, $tree_pid_list);
         if (!in_array($pid_on_url,$tree_pid_list)){
           watchdog('exhibition','Bad tree structure');
+          dsm('BBB Bad tree structure, not going to show it');
           drupal_not_found();
           $to_return = null;
           return si_exhibition_cache($cache_name, $cache_index, $to_return);
@@ -2007,10 +2014,10 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
      $to_print = '<h2 class="title block-title">SI Navigation</h2>';
      $to_print .= theme('si_exhibition_navigation', array('object'=>$object));
   }
-  if ($se['nav_location'] == 'left') $se['seu_nav_first'] = $to_print;//$block['content'];
-  if ($se['nav_location'] == 'right') $se['seu_nav_last'] = $to_print; //$block['content'];
-  if ($se['nav_location'] == 'bleft') $se['seu_nav_first_bottom'] = $to_print;//$block['content'];
-  if ($se['nav_location'] == 'bright') $se['seu_nav_last_bottom'] = $to_print; //$block['content'];
+  if ($se['nav_location'] == 'left') $se['seu_nav_first'] = $to_print;
+  if ($se['nav_location'] == 'right') $se['seu_nav_last'] = $to_print;
+  if ($se['nav_location'] == 'bleft') $se['seu_nav_first_bottom'] = $to_print;
+  if ($se['nav_location'] == 'bright') $se['seu_nav_last_bottom'] = $to_print;
   $_REQUEST['store_pid_config_'.$pid] = $se;
   $to_return = $se;
   return si_exhibition_cache($cache_name, $cache_index, $to_return);
@@ -2126,6 +2133,13 @@ function si_exhibition_get_visibility_tree($pid) {
       }]
     }]
   },{ 
+    "pid":"si:386002",
+    "name":"CSV filled with data",
+    "type":"resource",
+    "show_meta":true,
+    "show_preview":true,
+    "allow_download":true
+  },{ 
     "pid":"si:12346",
     "name":"Incomplete folder, will hold more info later",
     "type":"concept",
@@ -2144,9 +2158,31 @@ function si_exhibition_get_visibility_tree($pid) {
   return json_decode($vis_json, TRUE);
 }
 /*
+ * The tree looks like this:
+{
+  ['pid'] = $pid
+  ['object'] = Fedora object
+  ['children'] = array(
+    {
+      ['pid'] = 'si:child1',
+      ['object'] = Fedora object
+      ['children'] = array()
+    },{
+      ['pid'] = 'si:child2',
+      ['object'] = Fedora object
+      ['children'] = array()
+    },{
+      ['pid'] = 'si:child2',
+      ['object'] = Fedora object
+      ['children'] = array(),
+      ['already_in_tree'] = TRUE
+    },{
+    ...
+    }
+  )
  * return the php object representing the fedora tree
  */
-function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array()){
+function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array(), $path_from_root_to_current_pid = array()){
   //Request level cache
   //$req_key = $pid.'_'.$owner_id.'_'.implode(':',$pid_list);
   //global $get_pid_tree_request;
@@ -2175,8 +2211,7 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array()){
       $to_return['object'] = $object;
       $to_return['children'] = array();
       $pid_list[] = $pid;
-      //return $object->owner; //si_exhibition_get_child_concept_info($object);
-      $children = si_exhibition_get_child_concept_info($object);
+      $children = si_exhibition_get_child_concept_info_by_id($pid);
       //Get the children
       foreach($children as $child){
         //Build the tree from all the children
@@ -2275,6 +2310,7 @@ function si_exhibition_get_obj_datastream_content($pid) {
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $vis_obj = si_exhibition_get_visibility_object($pid);
   if (empty($vis_obj) || empty($vis_obj['allow_download'])) {
+    dsm('BBB no vis object or vis object allow_download');
     drupal_not_found();
     drupal_exit();
   }

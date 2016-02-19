@@ -220,11 +220,11 @@ function _si_exhibition_get_resource_table_row(array $resource) {
  * Displays both the parent/child concept links.
  */
 function theme_si_exhibition_navigation($vars){
-  $object = $vars['object'];
+  $pid = $vars['pid'];
   $output = '<div id="si-navigation"><div id="si-navigation-inner">';
   $output .= (variable_get('si_exhibition_expose_block', 'no') == 'no' ? '<h2>' . t('Navigation') . '</h2>' : '');
-  $output .= theme('si_exhibition_parent_concepts', array('object'=>$object));
-  $output .= theme('si_exhibition_child_concepts',  array('object'=>$object));
+  $output .= theme('si_exhibition_parent_concepts', array('pid'=>$pid));
+  $output .= theme('si_exhibition_child_concepts',  array('pid'=>$pid));
   $output .= '</div></div>';
   return $output;
 }
@@ -235,7 +235,7 @@ function theme_si_exhibition_navigation($vars){
  * Displays a list of parent concepts links.
  */
 function theme_si_exhibition_parent_concepts($vars) {
-  $object = $vars['object'];
+  $pid = $vars['pid'];
   global $main_path;
   $main_path = (isset($_GET['path']) ? $_GET['path'] : '');
   if (!empty($main_path)) {
@@ -253,7 +253,7 @@ function theme_si_exhibition_parent_concepts($vars) {
       global $main_path;
       return l($o['label'], "fedora/repository/{$o['pid']}", array('query' => array('path'=>$main_path))); 
     },
-    si_exhibition_get_parent_info($object, TRUE)
+    si_exhibition_get_parent_info_by_id($pid, TRUE)
   );
   $item_list_array = array(
     'items'=>$links,
@@ -270,22 +270,21 @@ function theme_si_exhibition_parent_concepts($vars) {
  * Displays a list of child concepts links along with their number of children.
  */
 function theme_si_exhibition_child_concepts($vars){
-    $object = $vars['object'];
-    //FedoraObject $object) {
+  $pid = $vars['pid'];
   global $main_path;
   $header ='<h3>' . t('Child concepts') . '</h3>';
   $main_path = (isset($_GET['path']) ? $_GET['path'] : '');
   if (empty($main_path)){
-    $main_path = $object->id;
+    $main_path = $pid;
   }else{
-    $main_path .= ','.$object->id;
+    $main_path .= ','.$pid;
   }
   $make_link = function($o) {
     global $main_path;
     return l($o['label'] . (($o['count'] > 0) ? " ({$o['count']})" : ''), "fedora/repository/{$o['pid']}", array('query' => array('path'=>$main_path))); 
   };
   
-  $links = array_map($make_link,  si_exhibition_get_child_concept_info($object));
+  $links = array_map($make_link,  si_exhibition_get_child_concept_info_by_id($pid));
   //var_dump($links);
   $item_list_array = array(
     'items'=>$links, 
@@ -317,24 +316,29 @@ function HandleXmlError($errno, $errstr, $errfile, $errline)
  *
  */
 function theme_si_exhibition_metadata_xmls($vars){
-  $object = $vars['object'];
+  $pid = $vars['object']->id;
   if (variable_get('si_exhibition_anonymous_only', FALSE)){
-    if (!si_exhibition_check_view_permission($object->id)){
+    if (!si_exhibition_check_view_permission($pid)){
+      dsm('BBB view_permission was false');
       drupal_not_found();
       return;
     }
   }
-  $vis_obj = si_exhibition_get_visibility_object($object->id);
+  $vis_obj = si_exhibition_get_visibility_object($pid);
   if (empty($vis_obj) || empty($vis_obj['show_meta'])) {
-    drupal_not_found();
-    drupal_exit();
+    //The page may be showing the metadata on a portion of the page and not a page of only metadata
+    //If that is the case, just return without indication that metadata is not shown.
+    dsm('BBB empty visibility object or show_meta empty');
+    dsm($vis_obj);
+    dsm($pid);
+    return '';
   }
-  $rows = si_models_get_display_xmls($object->id);
-  $datastream_content =  si_exhibition_meta_string_for_xslt($object);
+  $rows = si_models_get_display_xmls($pid);
+  $datastream_content =  si_exhibition_meta_string_for_xslt_by_id($pid);
   $output = $datastream_content;
   $doc = new DOMDocument();
   $xsl = new XSLTProcessor();
-  $xsl_string = si_exhibition_xsl_string($object->id);
+  $xsl_string = si_exhibition_xsl_string($pid);
   if ($xsl_string === FALSE){
     //No XSL string (bad news)
     drupal_set_message("Configuration problem, could not obtain XSL information from configured XSL provider. This usually means the exhibition server cannot contact the workbench server.", "error");
@@ -394,44 +398,11 @@ function theme_si_exhibition_metadata_xmls($vars){
  * Renders the An objects metadata as a Drupal table.
  */
 function theme_si_exhibition_metadata($vars){
-    $object = $vars['object'];
-    //FedoraObject $object) {
-  $rows = si_models_get_display_fields($object->id);
- //echo theme('table', $rows);
+  $pid = $vars['pid'];
+  $rows = si_models_get_display_fields($pid);
   return ($rows > 0) ? theme('table', array(), $rows, array('class' => 'metadata-table')) : t('This item has no metadata.');
-  //return ($rows > 0) ? theme('table', array(), $rows, array('class' => 'metadata-table')) : t('This item has no metadata.');
 }
 
-/**
- * Implements theme_hook().
- *
- * Renders An html repersentation of the TEXT datastream.
- */
-function theme_si_exhibition_text_datastream($vars){
-    $object = $vars['object'];
-    //FedoraObject $object) {
-  return nl2br(si_exhibition_get_text_datastream_content($object), TRUE);
-}
-
-
-/**
- * Implements theme_hook().
- *
- * An html repersentation of the CSV datastream.
- */
-function theme_si_exhibition_csv_datastream($vars){
-    $object = $vars['object'];
-    //FedoraObject $object) {
-  $filepath = 'public://csv.txt';
-  $content = si_exhibition_get_csv_datastream_content($object);
-  file_save_data($content, $filepath, FILE_EXISTS_REPLACE);
-  $rows = si_exhibition_transform_csv_file_to_array($filepath);
-  unlink($filepath);
-  $map_row = function($o) { return array('data' => $o); };
-  $rows = array_map(function($o) use($map_row) { return array_map($map_row, $o); }, $rows);
-  $header = array_shift($rows);
-  return theme('table', array('header' => $header, 'rows' => $rows));
-}
 
 /**
  * Initialize a pager for theme('pager') without running an SQL query.

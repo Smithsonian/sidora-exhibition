@@ -25,7 +25,9 @@ $object = $variables['object'];
      <h2 class="object-title"><?php print theme('si_exhibition_page_title', array('object' => $object)); ?></h2>
      <span class="si-icon <?php print $model_classes; ?>"></span>
      <div id="si-content-inner">
-      <?php print theme('si_exhibition_metadata_xmls', $variables); ?>
+      <?php print theme('si_exhibition_metadata_xmls', $variables); 
+      
+      ?>
      </div>
    </div>
    <div id="si-resources">
