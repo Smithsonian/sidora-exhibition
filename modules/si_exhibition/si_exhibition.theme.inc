@@ -316,10 +316,10 @@ function HandleXmlError($errno, $errstr, $errfile, $errline)
  *
  */
 function theme_si_exhibition_metadata_xmls($vars){
-  $pid = $vars['object']->id;
+  $pid = $vars['pid'];
   if (variable_get('si_exhibition_anonymous_only', FALSE)){
     if (!si_exhibition_check_view_permission($pid)){
-      dsm('BBB view_permission was false');
+      si_exhibition_debug('view_permission was false');
       drupal_not_found();
       return;
     }
@@ -328,9 +328,7 @@ function theme_si_exhibition_metadata_xmls($vars){
   if (empty($vis_obj) || empty($vis_obj['show_meta'])) {
     //The page may be showing the metadata on a portion of the page and not a page of only metadata
     //If that is the case, just return without indication that metadata is not shown.
-    dsm('BBB empty visibility object or show_meta empty');
-    dsm($vis_obj);
-    dsm($pid);
+    si_exhibition_debug('empty visibility object or show_meta empty:'.$pid);
     return '';
   }
   $rows = si_models_get_display_xmls($pid);
@@ -442,10 +440,6 @@ function si_exhibition_pager_init($total, $limit = 10, $element = 0) {
  *   The title if successful, an empty string otherwise.
  */
 function theme_si_exhibition_page_title($vars){
-  $object = $vars['object'];
-  $models = implode(' ', $object->models);
-  $classes = strtolower(preg_replace('/[^A-Za-z0-9 ]/', '-', $models) ); // Make valid css class
-  $title = check_plain($object->label);
-  //return "<span class='title'>$title</span><span class='si-icon $classes'></span>";
-  return "$title";//<span class='si-icon $classes'></span>";
+  $title = check_plain($vars['label']);
+  return "$title";
 }

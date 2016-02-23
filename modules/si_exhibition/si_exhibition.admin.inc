@@ -46,6 +46,13 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#size' => 100,
       '#description' => t('The Fedora Commons pid will be directly appended to the above, end with / if needed.'),
     ),
+    'si_exhibition_visibility_info_url' => array(
+      '#type' => 'textfield',
+      '#title' => t('Where to obtain the visibility information from the exhibition_config settings'),
+      '#default_value' => variable_get('si_exhibition_visibility_info_url', ''),
+      '#size' => 100,
+      '#description' => t('The Fedora Commons pid will be directly appended to the above, end with / if needed. WARNING: If empty, will not show any exhibition.'),
+    ),
     'si_exhibition_metadata_xsl' => array(
       '#type' => 'textarea',
       '#rows' => '25',

@@ -33,15 +33,24 @@ function si_exhibition_check_object_info_accessible(array $object_info) {
   return TRUE;
 }
 /**
+ * Determine if the object in question should be visible.
+ *
  * $parent_pid_path - String array of pids
- *                  - the path from the root of the exhibition to the direct parent of the pid to check
+ *                  the path from the root of the exhibition to the direct parent of the pid to check
+ *                  This needs to be a full path because concepts can show up in the exhibition more than once and have
+ *                  different visibility settings on their children between each occurrance.
+ *                  If NULL then will pull from the assumed path based on page request  
  * $to_check_pid - String of the pid to check for visibility
- * This needs to be a full path because concepts can show up in the exhibition more than once and have
- * different visibility settings on their children between each occurrance.
+ * returns TRUE or FALSE
  *
  */
 function si_exhibition_check_visibility($to_check_pid, $parent_pid_path = NULL) {
   $vis_obj = si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path);
+  $debug_info = array();
+  $debug_info['tcp'] = $to_check_pid;
+  $debug_info['ppp'] = $parent_pid_path;
+  $debug_info['vo'] = $vis_obj;
+  si_exhibition_debug('check_visibility', $debug_info);
   return ($vis_obj !== FALSE);
 }
 /**
@@ -81,6 +90,11 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
         return FALSE;
       }
     }
+    $debug_info = array();
+    $debug_info['cc'] = $curr_children;
+    $debug_info['cp'] = $curr_parent;
+    $debug_info['args'] = func_get_args();
+    si_exhibition_debug('get_visibility_object', $debug_info);
 
     //If we're looking for a concept then we should have ended up at the concept
     if ($curr_parent['pid'] == $to_check_pid) return $curr_parent;//array('show_meta'=>TRUE);//$curr_parent;
@@ -383,8 +397,8 @@ function si_exhibition_get_pid_path_to_concept_by_url($url) {
                   return $to_return; //Invalid pid in path
                 }
               }
+              $to_return = $check_pid_path;
             }
-            $to_return = $check_pid_path;
           }
         }
         $to_return[] = $final_pid;
