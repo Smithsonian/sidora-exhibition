@@ -1994,7 +1994,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
   curl_close($ch);
   $my_json = $data;
   $se = json_decode($my_json,true);
-  if ($se['error'] === TRUE){
+  if (!empty($se['error'])){
     if ($print_drupal_messages) {
       drupal_set_message(t('This item is unavailable for view. You may attempt downloading.'), 'error', FALSE);
     }

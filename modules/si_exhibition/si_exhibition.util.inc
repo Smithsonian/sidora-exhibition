@@ -383,7 +383,7 @@ function si_exhibition_get_pid_path_to_concept_by_url($url) {
     $request_path = $url_info['path'];
     $fr_location = strpos($request_path,'/fedora/repository/');
     if ($fr_location !== FALSE) {
-      $final_pid = substr($request_path,$fr_location+19);
+      $final_pid = urldecode(substr($request_path,$fr_location+19));
       if (si_exhibition_check_valid_pid($final_pid)) {
         if (!empty($url_info['query'])) {
           parse_str($url_info['query'],$query_holder);
@@ -392,8 +392,8 @@ function si_exhibition_get_pid_path_to_concept_by_url($url) {
             if (!empty($query_holder['path'])){
               $check_pid_path = explode(',',$query_holder['path']);
               foreach($check_pid_path as $check_pid) {
-                if (!si_exhibition_check_valid_pid($check_pid)){
-                  //print 'Invalid pid:'.$check_pid;
+                if (!si_exhibition_check_valid_pid(urldecode($check_pid))){
+                  print 'Invalid pid:'.$check_pid;
                   return $to_return; //Invalid pid in path
                 }
               }
@@ -416,23 +416,19 @@ function si_exhibition_get_pid_path_to_concept_by_url($url) {
  *   The type of resource to look for, can be any one of ('images', 'pdf', 'text', 'csv', 'video').
  * @param string $sort
  *   The sort to apply to the resources label either ('asc', 'desc').
- * @param int $limit
- *   The number of results to limit this query to.  Not used normally since this information is also used for a count of resources.
- * @param int $offset
- *   The offset into the number of results to truncate from the results. Not used normally since this information is also used for a count of resources.
  *
  * @return array
  *   An array of array's containing the following key value pairs for each child concpet of the given object:
  *    pid, label, datastreams
  */
-function si_exhibition_get_child_resource_info(FedoraObject $object, $type = 'all', $sort = 'asc', $limit = NULL, $offset = NULL) {
-  return si_exhibition_get_child_resource_info_by_id($object->id, $type, $sort, $limit, $offset);
+function si_exhibition_get_child_resource_info(FedoraObject $object, $type = 'all', $sort = 'asc') {
+  return si_exhibition_get_child_resource_info_by_id($object->id, $type, $sort);
 }
-function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', $sort = 'asc', $limit = NULL, $offset = NULL) {
+function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', $sort = 'asc') {
 
   //Start cache check for return
   $cache_name = 'child_resource_info';
-  $cache_index = $object_id.'_'.$type.'_'.$sort.'_'.$limit.'_'.$offset;
+  $cache_index = $object_id.'_'.$type.'_'.$sort;
   $to_return = si_exhibition_cache($cache_name,$cache_index);
   if (!empty($to_return)){ return $to_return; }
   si_exhibition_cron_cache(__FUNCTION__, func_get_args());
@@ -449,22 +445,64 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
   );
   $resources = array();
   $resource_types = isset($resource_types[$type]) ? $resource_types[$type] : FALSE;
-  if ($resource_types !== FALSE) {
+
+  $parent_path = si_exhibition_get_pid_path_to_showing_concept();
+  array_pop($parent_path); //Remove the current concept from the "parents" list
+  $vis_obj = si_exhibition_get_visibility_object($object_id, $parent_path); //Get the visibility of the current concept
+
+    //Walk through the visibility pulling out the type and number of items asked for
+    $count_so_far = 0;
+    $resources = array();
+    if (empty($vis_obj['children'])) {
+      dsm($vis_obj);
+      dsm($object_id);
+      dsm($parent_path);
+    }
+    foreach($vis_obj['children'] as $child_vis_obj) {
+      if (
+          !empty($child_vis_obj['pid']) && 
+          !empty($child_vis_obj['show_name']) && 
+          !empty($child_vis_obj['type']) && 
+          !empty($child_vis_obj['models']) && 
+          !empty($child_vis_obj['label']) && 
+          ($child_vis_obj['type'] == 'resource')
+         ) {
+        $add_current_resource = FALSE;
+        foreach($resource_types as $user_selected_resource_model) {
+          foreach($child_vis_obj['models'] as $current_obj_model) {
+            if ($current_obj_model == $user_selected_resource_model) {
+              $add_current_resource = TRUE;
+            }
+          }
+        }
+        if (empty($resource_types)) {  //Indicates "All" is selected
+          $add_current_resource = TRUE; 
+        }
+        if ($add_current_resource) {
+          $resources[] = array('pid' => $child_vis_obj['pid'], 'label' => $child_vis_obj['label']);
+        }
+      }
+    }
+    /*
     $repo = tuque_wrapper_get_repository_instance();
     $query = si_exhibition_generate_child_resource_query($object_id, $resource_types, $sort, $limit, $offset);
 		$results = $repo->ri->itqlQuery($query);
     $resources = array_map(function($o) { return array('pid' => $o['o']['value'], 'label' => $o['t']['value']); }, $results);
     // @todo replace the checks for each objects existance once we have the appropriate information in the rels to determine if its accessible.
-    $resources =  array_filter($resources, 'si_exhibition_check_object_info_accessible'); //BBB Security changes will necessitate this being used
-  }
-  $parent_path = si_exhibition_get_pid_path_to_showing_concept();
-  array_pop($parent_path); //Remove the current concept from the "parents" list
-  $vis_obj = si_exhibition_get_visibility_object($object_id, $parent_path); //Get the visibility of the current concept
+    */
+
+  $resources =  array_filter($resources, 'si_exhibition_check_object_info_accessible'); //BBB Security changes will necessitate this being used
+  /*
   $visible_child_list = array();
   if (!empty($vis_obj) && !empty($vis_obj['children'])) {
     //Fill up the list of items that the current concept has as visible children
     foreach($vis_obj['children'] as $child_vis_obj) {
-      if (!empty($child_vis_obj['pid'])) {
+      if (
+          !empty($child_vis_obj['pid']) && 
+          !empty($child_vis_obj['show_name']) && 
+          !empty($child_vis_obj['type']) && 
+          ($child_vis_obj['type'] == 'resource')
+         ) {
         $visible_child_list[] = $child_vis_obj['pid'];
       }
     }
@@ -473,6 +511,7 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
   $resources = array_filter($resources, function($elem) use($visible_child_list){
      return in_array($elem['pid'],$visible_child_list);
   });
+  */
   $to_return = $resources;
   return si_exhibition_cache($cache_name, $cache_index, $to_return);
 }
