@@ -250,11 +250,8 @@ function si_exhibition_block_view($delta='') {
 
   // Only ever display in /fedora/* when the user has access and the resource exists.
   if (arg(0) == 'fedora' && !$forbidden && !$not_found) {
-    $pid_for_config = arg(2);
+    $pid_for_config = array_shift(si_exhibition_get_pid_path_to_showing_concept());
     $pid = (arg(2) ? arg(2) : variable_get('fedora_repository_pid', 'si:root'));
-    $repo = tuque_wrapper_get_repository_instance();
-    si_exhibition_debug('repo from si_exhibition_block_view');
-    $object = $repo->getObject($pid); // We know it exists if we got passed the header checks
     
     switch ($delta) {
       case "seu_nav":
@@ -345,7 +342,17 @@ function _si_show_exhibition(){
   }
   $bad_path_set = TRUE;
   $to_return = !($bad_path);
-  return si_exhibition_cache($cache_name, $cache_index, $to_return);
+  $cached = si_exhibition_cache($cache_name, $cache_index, $to_return);
+  /*
+    var_dump($path_list);
+    var_dump($tree);
+    print "TPL:";
+    var_dump($tree_pid_list);
+    var_dump($bad_path);
+    var_dump($cached);
+    exit();
+  */
+  return $cached;
 }
 
 
@@ -361,15 +368,7 @@ function si_exhibition_preprocess_page(&$variables) {
     $variables['theme_hook_suggestions'][] = 'page_exhibition';
     $variables['title'] = NULL; // Title is displayed as part of the page content.
     $se = array();
-    $pid_for_config = arg(2);
-    $path = filter_input(INPUT_GET, 'path');
-    //if we have a path, make sure we can access that path
-    if (!empty($path)){
-      $path_list = explode(',',$path);
-      if (!empty($path_list[0])){
-        $pid_for_config = $path_list[0];
-      }
-    }
+    $pid_for_config = array_shift(si_exhibition_get_pid_path_to_showing_concept());
     try {
       $se = si_exhibition_get_item_display_config($pid_for_config, arg(2));
       if ($se['error'] == true) {
@@ -386,9 +385,8 @@ function si_exhibition_preprocess_page(&$variables) {
         $variables['primary_links_tree'] = drupal_render(menu_tree_output(menu_tree_all_data('main-menu')));
       }
     } catch(Exception $e) {
-      print ('exception'.$e->getMessage().'  '.$e->getTraceAsString());//BBB
+      watchdog('exhibition', 'si_exhibition_preprocess page exception:'.$e->getMessage().'  '.$e->getTraceAsString());
       exit();
-      $show_exhibition = false;
     }
   }
 }
@@ -407,13 +405,15 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     if (!si_exhibition_check_view_permission($pid)){
       watchdog('exhibition', 'si_exhibition_check_view_permission for:'.$pid.' was false');
       si_exhibition_debug('View permission false:'.$pid);
-      return drupal_not_found();
+     //   print __LINE__ . ' of ' . __FILE__; //BBB
+      return MENU_NOT_FOUND;
     }
   }
   if (!_si_show_exhibition()){
     watchdog('exhibition', '_si_show_exhibition for:'.$pid.' was false');
     si_exhibition_debug('Show exhibition explicitly false:'.$pid);
-    return drupal_not_found();
+    //    print __LINE__ . ' of ' . __FILE__; //BBB
+    return MENU_NOT_FOUND; //drupal_not_found();
   }
 
   //Something should either be viewable via the xsl or downloadable with a file extension
@@ -421,8 +421,8 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
   $file_extension = si_exhibition_forward_direct_open_access(array('file_extension', $pid), TRUE, FALSE);
   if (empty($xsl_config) && empty($file_extension)){
     si_exhibition_debug('xsl_config or file_extention empty:'.$pid);
-    drupal_not_found();
-    drupal_exit();
+    //    print __LINE__ . ' of ' . __FILE__; //BBB
+    return MENU_NOT_FOUND;
   }
 
 
@@ -432,35 +432,37 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     //to be hidden
     if ($dsid == 'RELS-EXT') {
       si_exhibition_debug('Not allowed to use viewer directly on RELS-EXT datastream:'.$pid);
-      drupal_not_found();
-      drupal_exit();
+      //  print __LINE__ . ' of ' . __FILE__; //BBB
+      return MENU_NOT_FOUND;
     }
 
     //OBJ is special since that is to download the item, don't allow the OBJ datastream for
     //the generic previews
     if ($dsid == 'OBJ') {
       si_exhibition_debug('Not allowed to use viewer directly on OBJ datastream:'.$pid);
-      drupal_not_found();
-      drupal_exit();
+      //  print __LINE__ . ' of ' . __FILE__; //BBB
+      return MENU_NOT_FOUND;
     }
 
     require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
     $vis_obj = si_exhibition_get_visibility_object($pid);
     if (empty($vis_obj) || empty($vis_obj['show_preview'])) {
       si_exhibition_debug('Visibility object empty or show_preview was empty');
-      drupal_not_found();
-      drupal_exit();
+      //  print __LINE__ . ' of ' . __FILE__; //BBB
+      //  print $pid;
+      //  var_dump($vis_obj);
+      return MENU_NOT_FOUND;
     }
     
     $xsl_config = si_exhibition_forward_direct_open_access(array('xsl_config', $pid), TRUE, FALSE);
-    if (empty($xsl_config)) {
+    if (!empty($xsl_config) && !empty($xsl_config->dsid)) {
       $specific_meta = $xsl_config->dsid;
       //This is the datastream that is considered for "show meta" so should only be allowed if show meta is allowed
       //In order to get through to show the direct meta, the setting must be "show_meta" (this code) and "show_preview" (lines above) as true
       if (empty($vis_obj['show_meta']) && ((string)$dsid === (string)$specific_meta)) {
         si_exhibition_debug('Show meta is not true, and the datastream requested is considered the metadata datastream:'.$pid.' '.$dsid);
-        drupal_not_found();
-        drupal_exit();
+        //print __LINE__ . ' of ' . __FILE__; //BBB
+        return MENU_NOT_FOUND;
       }
     }
 
@@ -471,6 +473,16 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
       si_exhibition_sidora_viewer($object);
     }
     else {
+      //print $dsid;//$object[$dsid]->size;
+      $datastream = $object[$dsid];
+      //var_dump($datastream);
+      //var_dump($object);
+      //$datastream->populateDatastreamInfo();
+      //$datastream->refresh();
+
+      $datastream = $object[$dsid];
+      $content = $datastream->content;
+
       if (isset($_SERVER['HTTP_RANGE'])) {
        si_exhibition_deliver_streaming($pid, $dsid);
        exit();
@@ -482,10 +494,9 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
   }
   if (!empty($object)){
     return theme('si_exhibition_object', array('object'=>$object));
-    exit();
+    drupal_exit();
   }else{
-    print "not found";
-    exit();
+    return MENU_NOT_FOUND;
   }
   
 }
@@ -505,8 +516,9 @@ function sidora_obj($pid){
           drupal_set_message(t('The Fedora repository server is currently unavailable. Please contact the site administrator.'), 'error', FALSE);
         }
         watchdog('exhibition', '404 error getting pid:'.$pid.'.');
-        dsm('Could not reach Fedora');
-        drupal_not_found();
+        //dsm('Could not reach Fedora');
+        //drupal_not_found();
+        //print __LINE__ . ' of ' . __FILE__; //BBB
         break;
       case '401':
       case '403':
@@ -526,8 +538,9 @@ function sidora_obj($pid){
           '%line' => $caller['line']
         );
         watchdog('islandora', $message, $variables, WATCHDOG_ERROR, NULL);
-        dsm('Islandora error');
-        drupal_not_found();
+        //dsm('Islandora error');
+        //drupal_not_found();
+        //print __LINE__ . ' of ' . __FILE__; //BBB
         break;
     }
     exit();
@@ -633,6 +646,7 @@ function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $
     }
     return $se;
   }
+      /*
       ob_start();
       print "Success on open access call\n";
       var_dump($ch);
@@ -640,6 +654,7 @@ function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $
       var_dump(curl_getinfo($ch));
       $debug_result = ob_get_clean();
       si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+      */
 
   curl_close($ch);
   if ($raw){
@@ -739,6 +754,7 @@ function si_exhibition_meta_string_for_xslt_by_id($pid){
       $_REQUEST['store_pid_config_'.$pid] = $se;
       return $se;
     }
+      /*
       ob_start();
       print "Success on meta string for xslt\n";
       var_dump($ch);
@@ -746,6 +762,7 @@ function si_exhibition_meta_string_for_xslt_by_id($pid){
       var_dump(curl_getinfo($ch));
       $debug_result = ob_get_clean();
       si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+      */
 
     curl_close($ch);
     $xsl_config = json_decode($data);
@@ -837,6 +854,7 @@ function si_exhibition_xsl_string($pid){
     }
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     if($httpCode == 404) {
+      /*
       ob_start();
       print "404 on call to get XSL\n";
       var_dump($ch);
@@ -844,9 +862,11 @@ function si_exhibition_xsl_string($pid){
       var_dump(curl_getinfo($ch));
       $debug_result = ob_get_clean();
       si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+      */
       dsm("404'd: $url_to_get");
       return FALSE;
     }
+    /*
     ob_start();
     print "Successful call to get XSL\n";
     var_dump($ch);
@@ -854,7 +874,7 @@ function si_exhibition_xsl_string($pid){
     var_dump(curl_getinfo($ch));
     $debug_result = ob_get_clean();
     si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
-
+    */
     curl_close($ch);
     $my_xsl = $data;
 
@@ -1933,6 +1953,7 @@ function si_exhibition_sidora_debug($debug_string, $cgi = NULL) {
  * Will return NULL on errors and may set drupal error messages during the error processing
  */
 function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_messages = TRUE){
+  
   $path = filter_input(INPUT_GET, 'path');
   $pid_on_url = arg(2); 
 
@@ -1981,6 +2002,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
     $to_return = $se;
     return si_exhibition_cache($cache_name, $cache_index, $to_return);
   }
+    /*
     ob_start();
     print "Successful call to Exhibition_config\n";
     var_dump($ch);
@@ -1988,7 +2010,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
     var_dump(curl_getinfo($ch));
     $debug_result = ob_get_clean();
     si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
-
+    */
 
 
   curl_close($ch);
@@ -1997,6 +2019,11 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
   if (!empty($se['error'])){
     if ($print_drupal_messages) {
       drupal_set_message(t('This item is unavailable for view. You may attempt downloading.'), 'error', FALSE);
+      dsm("nav_to_pid");
+      dsm($nav_to_pid);
+      dsm($pid);
+      dsm($debug_result);
+      dsm($se);
     }
     $to_return = null;
     return si_exhibition_cache($cache_name, $cache_index, $to_return);
@@ -2017,9 +2044,10 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
         if (!in_array($pid_on_url,$tree_pid_list)){
           watchdog('exhibition','Bad tree structure');
           si_exhibition_debug('Bad tree structure, not going to show it');
-          drupal_not_found();
-          $to_return = null;
-          return si_exhibition_cache($cache_name, $cache_index, $to_return);
+          //print __LINE__ . ' of ' . __FILE__; //BBB
+          //drupal_not_found() goes into infinite loop here
+          //drupal_exit() goes into infinite loop here
+          exit();//drupal_exit();
         }
       }
     }
@@ -2117,6 +2145,7 @@ function si_exhibition_get_visibility_tree($pid = NULL) {
   curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
   $data = curl_exec($ch);
   if ($data === FALSE){
+    /*
     ob_start();
     print "Error on visibility tree call\n";
     var_dump($ch);
@@ -2124,6 +2153,7 @@ function si_exhibition_get_visibility_tree($pid = NULL) {
     var_dump(curl_getinfo($ch));
     $debug_result = ob_get_clean();
     si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+    */
 
     $curl_error_string = curl_error($ch);
    // print_t('Could not obtain data from:'.$url_to_get);
@@ -2139,12 +2169,20 @@ function si_exhibition_get_visibility_tree($pid = NULL) {
   var_dump($ch);
   var_dump(curl_error($ch));
   var_dump(curl_getinfo($ch));
+  var_dump($data);
   $debug_result = ob_get_clean();
-  si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+  si_exhibition_debug($debug_result, curl_getinfo($ch));
+
   curl_close($ch);
  
   
   $GLOBALS[$url_to_get] = json_decode($data, TRUE);
+  ob_start();
+  print "Returning visibility object\n";
+  var_dump ($GLOBALS[$url_to_get]);
+  $debug_result = ob_get_clean();
+  si_exhibition_debug($debug_result);
+
   return $GLOBALS[$url_to_get];
 }
 /*
@@ -2184,7 +2222,14 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array(), $pat
   $repo = tuque_wrapper_get_repository_instance();
   si_exhibition_debug('repo from _si_exhibition_get_pid_tree');
   $visibility_settings_check = si_exhibition_check_visibility($pid, $path_from_root_to_current_pid);
-
+  /*
+  print "\nStart\n";
+  var_dump($visibility_settings_check);
+  var_dump($pid);
+  var_dump($path_from_root_to_current_pid);
+  print "\nEnd\n";
+  */
+  
   $debug_info = array();
   $debug_info['pid'] = $pid;
   $debug_info['pfrtcp'] = $path_from_root_to_current_pid;
@@ -2212,6 +2257,12 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array(), $pat
       $to_return['children'] = array();
       $pid_list[] = $pid;
       $children = si_exhibition_get_child_concept_info_by_id($pid);
+      /*
+      print "\nchildren:";
+      var_dump($children);
+      print "\nfor pid:";
+      var_dump($pid);//BBB
+      */
       $path_from_root_to_current_pid[] = $pid;
       //Get the children
       foreach($children as $child){
@@ -2315,7 +2366,7 @@ function si_exhibition_get_obj_datastream_content($pid) {
   $vis_obj = si_exhibition_get_visibility_object($pid);
   if (empty($vis_obj) || empty($vis_obj['allow_download'])) {
     si_exhibition_sidora_debug('No vis object or vis object allow_download');
-    drupal_not_found();
+        //print __LINE__ . ' of ' . __FILE__; //BBB
     drupal_exit();
   }
   $repo = tuque_wrapper_get_repository_instance();
@@ -2349,6 +2400,7 @@ function si_exhibition_get_obj_datastream_content($pid) {
       curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
       $data = curl_exec($ch);
       if ($data === FALSE){
+        /*
         ob_start();
         print "Error on file extension call\n";
         var_dump($ch);
@@ -2356,6 +2408,7 @@ function si_exhibition_get_obj_datastream_content($pid) {
         var_dump(curl_getinfo($ch));
         $debug_result = ob_get_clean();
         si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+        */
 
         $curl_error_string = curl_error($ch);
        // print_t('Could not obtain data from:'.$url_to_get);
@@ -2365,6 +2418,7 @@ function si_exhibition_get_obj_datastream_content($pid) {
         curl_close($ch);
         return;
       }
+      /*
       ob_start();
       print "Success on file extension call\n";
       var_dump($ch);
@@ -2372,6 +2426,7 @@ function si_exhibition_get_obj_datastream_content($pid) {
       var_dump(curl_getinfo($ch));
       $debug_result = ob_get_clean();
       si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+      */
       curl_close($ch);
 
       $extension = json_decode($data);

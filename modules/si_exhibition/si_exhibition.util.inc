@@ -70,7 +70,6 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
   // Return if the child pid is there
   if (!empty($parent_pid_path)){
     $vis_tree = si_exhibition_get_visibility_tree($parent_pid_path[0]);
-    //dsm($vis_tree);
     $curr_children = array($vis_tree);
     foreach($parent_pid_path as $curr_pid){
       $found_next_child = FALSE;
@@ -97,7 +96,9 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
     si_exhibition_debug('get_visibility_object', $debug_info);
 
     //If we're looking for a concept then we should have ended up at the concept
-    if ($curr_parent['pid'] == $to_check_pid) return $curr_parent;//array('show_meta'=>TRUE);//$curr_parent;
+    if ($curr_parent['pid'] == $to_check_pid) {
+      return $curr_parent;//array('show_meta'=>TRUE);//$curr_parent;
+    }
     
     //If it's made it here, then it didn't return false when attempting to go down the wrong path
     //So the object that is located in $curr_children will hold all the valid objects that will be
@@ -357,11 +358,18 @@ function si_exhibition_get_pid_path_to_showing_concept($url = NULL) {
   }
   $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['REQUEST_URI']);
   if (!empty($pid_path)) {
+    $_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
     return $pid_path;
   }
-  else {
-    return si_exhibition_get_pid_path_to_concept_by_url($_SERVER['HTTP_REFERER']);
+  $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['HTTP_REFERER']);
+  if (!empty($pid_path)) {
+    $_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
+    return $pid_path;
   }
+  if (!empty($_SESSION['si_exhibition_latest_pid_path'])){
+    return $_SESSION['si_exhibition_latest_pid_path'];
+  }
+  return array();
 }
 /*
  * Return whether a string has the possibility of being a pid
@@ -450,46 +458,37 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
   array_pop($parent_path); //Remove the current concept from the "parents" list
   $vis_obj = si_exhibition_get_visibility_object($object_id, $parent_path); //Get the visibility of the current concept
 
-    //Walk through the visibility pulling out the type and number of items asked for
-    $count_so_far = 0;
-    $resources = array();
-    if (empty($vis_obj['children'])) {
-      dsm($vis_obj);
-      dsm($object_id);
-      dsm($parent_path);
-    }
-    foreach($vis_obj['children'] as $child_vis_obj) {
-      if (
-          !empty($child_vis_obj['pid']) && 
-          !empty($child_vis_obj['show_name']) && 
-          !empty($child_vis_obj['type']) && 
-          !empty($child_vis_obj['models']) && 
-          !empty($child_vis_obj['label']) && 
-          ($child_vis_obj['type'] == 'resource')
-         ) {
-        $add_current_resource = FALSE;
-        foreach($resource_types as $user_selected_resource_model) {
-          foreach($child_vis_obj['models'] as $current_obj_model) {
-            if ($current_obj_model == $user_selected_resource_model) {
-              $add_current_resource = TRUE;
-            }
-          }
-        }
-        if (empty($resource_types)) {  //Indicates "All" is selected
-          $add_current_resource = TRUE; 
-        }
-        if ($add_current_resource) {
-          $resources[] = array('pid' => $child_vis_obj['pid'], 'label' => $child_vis_obj['label']);
+  //Walk through the visibility pulling out the type and number of items asked for
+  $count_so_far = 0;
+  $resources = array();
+  if (empty($vis_obj)){
+    //The visibility object needs to exist to pull info from it
+    return NULL;
+  }
+  foreach($vis_obj['children'] as $child_vis_obj) {
+    if (
+        !empty($child_vis_obj['pid']) && 
+        !empty($child_vis_obj['show_name']) && 
+        !empty($child_vis_obj['type']) && 
+        !empty($child_vis_obj['model']) && 
+        !empty($child_vis_obj['label']) && 
+        (strtolower($child_vis_obj['type']) == 'resource')
+       ) {
+      $add_current_resource = FALSE;
+      foreach($resource_types as $user_selected_resource_model) {
+        $current_obj_model = $child_vis_obj['model'];
+        if ($current_obj_model == $user_selected_resource_model) {
+          $add_current_resource = TRUE;
         }
       }
+      if (empty($resource_types)) {  //Indicates "All" is selected
+        $add_current_resource = TRUE; 
+      }
+      if ($add_current_resource) {
+        $resources[] = array('pid' => $child_vis_obj['pid'], 'label' => $child_vis_obj['label']);
+      }
     }
-    /*
-    $repo = tuque_wrapper_get_repository_instance();
-    $query = si_exhibition_generate_child_resource_query($object_id, $resource_types, $sort, $limit, $offset);
-		$results = $repo->ri->itqlQuery($query);
-    $resources = array_map(function($o) { return array('pid' => $o['o']['value'], 'label' => $o['t']['value']); }, $results);
-    // @todo replace the checks for each objects existance once we have the appropriate information in the rels to determine if its accessible.
-    */
+  }
 
   $resources =  array_filter($resources, 'si_exhibition_check_object_info_accessible'); //BBB Security changes will necessitate this being used
   /*
@@ -524,6 +523,7 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
  * $offset - first element to fill information for
  */
 function si_exhibition_fill_out_resources(&$resources, $show, $limit = NULL, $offset = NULL){
+  if ($resources === NULL) return; //It should at least be an empty array if no resources shown
   if (empty($limit)) $limit = sizeof($resources);
   if (empty($offset)) $offset = 0;
   $repo = tuque_wrapper_get_repository_instance();

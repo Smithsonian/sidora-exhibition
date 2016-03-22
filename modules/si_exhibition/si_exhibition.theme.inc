@@ -62,6 +62,9 @@ function theme_si_exhibition_resource_table($vars){
   $show = $vars['show'];
   $offset = $vars['offset'];
   $limit = $vars['limit'];
+  if (!is_array($resources)) {
+    return;  //No resources then nothing to do
+  }
   $rows = array_map(function($o) { return _si_exhibition_get_resource_table_row($o); }, $resources);
   $rows = array_slice($rows, $offset, $limit);
   if (!empty($rows)) {
@@ -166,26 +169,38 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   //Originally set up as a single DSID, shoehorning in having datastream options
   $view = '';
 
-  $available_view = '';
-  if (is_array($display['view'])) foreach($display['view'] as $curr_view) if (array_search($curr_view, $resource['datastreams']) !== FALSE) $available_view = $curr_view;
-  if (!empty($available_view)){ $display['view'] = $available_view;  }
-
-  if (array_search($display['view'], $resource['datastreams']) !== FALSE) {
-    $thumbnail_url = url("fedora/repository/{$resource['pid']}/TN");
-    $view_preview = (isset($display['tn']) && array_search('TN', $resource['datastreams']) !== FALSE) ? "<img class='resource-tn' src='$thumbnail_url'/>" : '';
-    if (isset($display['url'])) {
-      $view = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '">' . $view_preview . '</a>';
-    }
-    else {
-      $display_datastream_function = "return {$display['func']}('{$resource['pid']}', '{$display['view']}');";
-      if (empty($view_preview)) {
-        $view = '<a href="#" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '" onclick="' . $display_datastream_function . '">Preview</a>';
-      } 
+  if ($resource['visibility']['show_preview']){ //Do not show the "preview" thumbnail & link if preview is off
+    $available_view = '';
+    if (is_array($display['view'])) foreach($display['view'] as $curr_view) if (array_search($curr_view, $resource['datastreams']) !== FALSE) $available_view = $curr_view;
+    if (!empty($available_view)){ $display['view'] = $available_view;  }
+    $preview = '';
+    if (array_search($display['view'], $resource['datastreams']) !== FALSE) {
+      $thumbnail_url = url("fedora/repository/{$resource['pid']}/TN");
+      $view_preview = (isset($display['tn']) && array_search('TN', $resource['datastreams']) !== FALSE) ? "<img class='resource-tn' src='$thumbnail_url'/>" : '';
+      if (isset($display['url'])) {
+        $prefix = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" rel="shadowbox" title="' . $resource['label'] . '">';
+        $postfix = '</a>';
+        $view = $prefix . $view_preview . $postfix;
+        $preview = $prefix . 'Preview' . $postfix;
+      }
       else {
-        $view = '<a href="#" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '" onclick="' . $display_datastream_function . '">' . $view_preview . '</a>';
+        $display_datastream_function = "return {$display['func']}('{$resource['pid']}', '{$display['view']}');";
+        if (empty($view_preview)) {
+          $prefix = '<a href="#" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '" onclick="' . $display_datastream_function . '">';
+          $postfix = '</a>';
+          $view = $prefix . 'Preview' . $postfix;
+          $preview = $prefix . 'Preview' . $postfix;
+        } 
+        else {
+          $prefix = '<a href="#" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '" onclick="' . $display_datastream_function . '">';
+          $postfix = '</a>';
+          $view = $prefix . $view_preview . $postfix;
+          $preview = $prefix . 'Preview' . $postfix;
+        }
       }
     }
   }
+
   // Type
   list($icon, $type) = $display['type'];
   $type = "<div class='r-icon $icon title='$type'>$type</div>";
@@ -205,11 +220,16 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   if (array_search($display['dsid'], $resource['datastreams']) !== FALSE) {
 		$download = l('Download', 'fedora/download/' . $resource['pid'], array('class'=> $display['class']));
 	}
-  $preview = '<a href="#" rel="shadowbox[' . $resource['pid'] . ']" title="' . $resource['label'] . '" onclick="' . $display_datastream_function . '">Preview</a>';
+
+  if (empty($preview)){
+    $prefix = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" rel="shadowbox" title="' . $resource['label'] . '">';
+    $postfix = '</a>';
+    $preview = $prefix . 'Preview' . $postfix;
+  }
   $option_dropdown = '<div class="regular-options">';
-  if ($resource['visibility']['allow_download']) $option_dropdown .= $download;
   if ($resource['visibility']['show_meta'])      $option_dropdown .= $metadata;
   if ($resource['visibility']['show_preview'])   $option_dropdown .= $preview;
+  if ($resource['visibility']['allow_download']) $option_dropdown .= $download;
   $option_dropdown .= '</div>';
   return array($view, '<span class="table-label">'.$label.'<span>', $option_dropdown); //$metadata, $type, $download);
 }
