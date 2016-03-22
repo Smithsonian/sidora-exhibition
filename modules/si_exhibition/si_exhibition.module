@@ -2017,16 +2017,8 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
   $my_json = $data;
   $se = json_decode($my_json,true);
   if (!empty($se['error'])){
-    if ($print_drupal_messages) {
-      drupal_set_message(t('This item is unavailable for view. You may attempt downloading.'), 'error', FALSE);
-      dsm("nav_to_pid");
-      dsm($nav_to_pid);
-      dsm($pid);
-      dsm($debug_result);
-      dsm($se);
-    }
-    $to_return = null;
-    return si_exhibition_cache($cache_name, $cache_index, $to_return);
+    //No longer give download message, instead fully hide the data.  drupal_not_found() produces infinite loop
+    drupal_exit();
   }
   if (isset($se['nav_type']) && $se['nav_type'] == 'tree'){
     //See if the tree should start on the current node or if there is a path
@@ -2047,7 +2039,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
           //print __LINE__ . ' of ' . __FILE__; //BBB
           //drupal_not_found() goes into infinite loop here
           //drupal_exit() goes into infinite loop here
-          exit();//drupal_exit();
+          exit();
         }
       }
     }
