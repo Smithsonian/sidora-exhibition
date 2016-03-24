@@ -277,6 +277,7 @@ function theme_si_exhibition_parent_concepts($vars) {
   $path_pieces = explode(',',$full_path);
   //Go down through the visibility tree until we end up at the parent
   $curr_tree_loc = $full_tree;
+  if (empty($curr_tree_loc)) return '';
   foreach($path_pieces as $piece) {
     foreach($curr_tree_loc['children'] as $ctl_child) {
       if ($ctl_child['pid'] == $piece) {
@@ -322,6 +323,7 @@ function theme_si_exhibition_child_concepts($vars){
     return l($child['label'], "fedora/repository/{$child['pid']}", array('query' => array('path'=>$main_path)));
   };
   $vo = si_exhibition_get_visibility_object($pid);
+  if (empty($vo)) return '';
   $links = array_filter(array_map($make_link, $vo['children']));
   
   $item_list_array = array(
@@ -380,7 +382,7 @@ function theme_si_exhibition_metadata_xmls($vars){
   $xsl_string = si_exhibition_xsl_string($pid);
   if ($xsl_string === FALSE){
     //No XSL string (bad news)
-    drupal_set_message("Configuration problem, could not obtain XSL information from configured XSL provider. This usually means the exhibition server cannot contact the workbench server.", "error");
+    //drupal_set_message("Configuration problem, could not obtain XSL information from configured XSL provider. This usually means the exhibition server cannot contact the workbench server.", "error");
     watchdog("exhibition",'xsl_string was bad for:'.$pid);
     return '';
   }
