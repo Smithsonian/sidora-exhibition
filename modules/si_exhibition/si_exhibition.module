@@ -1,4 +1,5 @@
 <?php
+$GLOBALS['print_debug_lines'] = FALSE;
 /**
  * @file
  *
@@ -405,14 +406,14 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     if (!si_exhibition_check_view_permission($pid)){
       watchdog('exhibition', 'si_exhibition_check_view_permission for:'.$pid.' was false');
       si_exhibition_debug('View permission false:'.$pid);
-     //   print __LINE__ . ' of ' . __FILE__; //BBB
+      if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
       return MENU_NOT_FOUND;
     }
   }
   if (!_si_show_exhibition()){
     watchdog('exhibition', '_si_show_exhibition for:'.$pid.' was false');
     si_exhibition_debug('Show exhibition explicitly false:'.$pid);
-    //    print __LINE__ . ' of ' . __FILE__; //BBB
+    if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
     return MENU_NOT_FOUND; //drupal_not_found();
   }
 
@@ -421,7 +422,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
   $file_extension = si_exhibition_forward_direct_open_access(array('file_extension', $pid), TRUE, FALSE);
   if (empty($xsl_config) && empty($file_extension)){
     si_exhibition_debug('xsl_config or file_extention empty:'.$pid);
-    //    print __LINE__ . ' of ' . __FILE__; //BBB
+    if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
     return MENU_NOT_FOUND;
   }
 
@@ -432,7 +433,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     //to be hidden
     if ($dsid == 'RELS-EXT') {
       si_exhibition_debug('Not allowed to use viewer directly on RELS-EXT datastream:'.$pid);
-      //  print __LINE__ . ' of ' . __FILE__; //BBB
+      if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
       return MENU_NOT_FOUND;
     }
 
@@ -440,7 +441,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     //the generic previews
     if ($dsid == 'OBJ') {
       si_exhibition_debug('Not allowed to use viewer directly on OBJ datastream:'.$pid);
-      //  print __LINE__ . ' of ' . __FILE__; //BBB
+        if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
       return MENU_NOT_FOUND;
     }
 
@@ -448,7 +449,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     $vis_obj = si_exhibition_get_visibility_object($pid);
     if (empty($vis_obj) || empty($vis_obj['show_preview'])) {
       si_exhibition_debug('Visibility object empty or show_preview was empty');
-      //  print __LINE__ . ' of ' . __FILE__; //BBB
+      if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
       //  print $pid;
       //  var_dump($vis_obj);
       return MENU_NOT_FOUND;
@@ -461,7 +462,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
       //In order to get through to show the direct meta, the setting must be "show_meta" (this code) and "show_preview" (lines above) as true
       if (empty($vis_obj['show_meta']) && ((string)$dsid === (string)$specific_meta)) {
         si_exhibition_debug('Show meta is not true, and the datastream requested is considered the metadata datastream:'.$pid.' '.$dsid);
-        //print __LINE__ . ' of ' . __FILE__; //BBB
+        if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
         return MENU_NOT_FOUND;
       }
     }
@@ -518,7 +519,7 @@ function sidora_obj($pid){
         watchdog('exhibition', '404 error getting pid:'.$pid.'.');
         //dsm('Could not reach Fedora');
         //drupal_not_found();
-        //print __LINE__ . ' of ' . __FILE__; //BBB
+        if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
         break;
       case '401':
       case '403':
@@ -540,7 +541,7 @@ function sidora_obj($pid){
         watchdog('islandora', $message, $variables, WATCHDOG_ERROR, NULL);
         //dsm('Islandora error');
         //drupal_not_found();
-        //print __LINE__ . ' of ' . __FILE__; //BBB
+        if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
         break;
     }
     exit();
@@ -551,7 +552,10 @@ function si_exhibition_sidora_viewer($object){
   global $base_url;
   $pid = $object->id;
   $viewer_config = si_exhibition_forward_direct_open_access(array('viewer_config', $object->id), FALSE, FALSE);
-  if (empty($viewer_config)) drupal_exit();
+  if (empty($viewer_config)) {
+    watchdog('exhibition','No viewer config for:'.$pid);
+    drupal_exit();
+  }
   module_load_include('inc', 'si_exhibition', 'includes/workbench_viewers');
   $viewer = $viewer_config->viewer_id;
     switch ($viewer) {
@@ -642,6 +646,7 @@ function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $
     $se['error'] = $curl_error_string;
     $_REQUEST['store_pid_config_'.$pid] = $se;
     if ($exit) {
+      watchdog('exhibition','Open access errored on:'.$url_to_get);
       drupal_exit();
     }
     return $se;
@@ -863,7 +868,7 @@ function si_exhibition_xsl_string($pid){
       $debug_result = ob_get_clean();
       si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
       */
-      dsm("404'd: $url_to_get");
+      //dsm("404'd: $url_to_get");
       return FALSE;
     }
     /*
@@ -2018,6 +2023,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
   $se = json_decode($my_json,true);
   if (!empty($se['error'])){
     //No longer give download message, instead fully hide the data.  drupal_not_found() produces infinite loop
+    watchdog('exhibition','Exhibition Config indicated this is not a good item to get:'.$url_to_get);
     drupal_exit();
   }
   if (isset($se['nav_type']) && $se['nav_type'] == 'tree'){
@@ -2036,7 +2042,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
         if (!in_array($pid_on_url,$tree_pid_list)){
           watchdog('exhibition','Bad tree structure');
           si_exhibition_debug('Bad tree structure, not going to show it');
-          //print __LINE__ . ' of ' . __FILE__; //BBB
+          if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
           //drupal_not_found() goes into infinite loop here
           //drupal_exit() goes into infinite loop here
           exit();
@@ -2358,7 +2364,8 @@ function si_exhibition_get_obj_datastream_content($pid) {
   $vis_obj = si_exhibition_get_visibility_object($pid);
   if (empty($vis_obj) || empty($vis_obj['allow_download'])) {
     si_exhibition_sidora_debug('No vis object or vis object allow_download');
-        //print __LINE__ . ' of ' . __FILE__; //BBB
+    watchdog('exhibition','Obj datastream content not allowed:'.$pid);
+    if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
     drupal_exit();
   }
   $repo = tuque_wrapper_get_repository_instance();
@@ -2371,6 +2378,7 @@ function si_exhibition_get_obj_datastream_content($pid) {
 	}	
   if (empty($datastream_content)){
     print t('Datastream not found by that name');
+    watchdog('exhibition','Obj datastream content not exist:'.$pid);
     drupal_exit();
   }
   //datastream_content is now set.  perform the output

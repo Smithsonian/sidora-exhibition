@@ -240,7 +240,13 @@ function _si_exhibition_get_resource_table_row(array $resource) {
  * Displays both the parent/child concept links.
  */
 function theme_si_exhibition_navigation($vars){
-  $pid = $vars['pid'];
+  if (array_key_exists('pid',$vars)){
+    $pid = $vars['pid'];
+  }else if (array_key_exists('object',$vars)){
+    $pid = $vars['object']->id;
+  } else{
+    return '';
+  }
   $output = '<div id="si-navigation"><div id="si-navigation-inner">';
   $output .= (variable_get('si_exhibition_expose_block', 'no') == 'no' ? '<h2>' . t('Navigation') . '</h2>' : '');
   $output .= theme('si_exhibition_parent_concepts', array('pid'=>$pid));
@@ -257,7 +263,8 @@ function theme_si_exhibition_navigation($vars){
 function theme_si_exhibition_parent_concepts($vars) {
   $pid = $vars['pid'];
   global $main_path;
-  $main_path = (isset($_GET['path']) ? $_GET['path'] : '');
+  $full_path = (isset($_GET['path']) ? $_GET['path'] : '');
+  $main_path = $full_path;
   if (!empty($main_path)) {
     $lastComma = strrpos($main_path, ",");
     if ($lastComma === false) {
@@ -266,22 +273,32 @@ function theme_si_exhibition_parent_concepts($vars) {
       $main_path = substr($main_path, 0, $lastComma);
     }
   }
+  $full_tree = si_exhibition_get_visibility_tree(); 
+  $path_pieces = explode(',',$full_path);
+  //Go down through the visibility tree until we end up at the parent
+  $curr_tree_loc = $full_tree;
+  foreach($path_pieces as $piece) {
+    foreach($curr_tree_loc['children'] as $ctl_child) {
+      if ($ctl_child['pid'] == $piece) {
+        $curr_tree_loc = $ctl_child;
+      }
+    }
+  }
+  $header = '<h3>' . t('Parent concept') . '</h3>';
+  $links = array();
+  if (!empty($full_path)) {
+    $link = l($curr_tree_loc['label'], "fedora/repository/{$curr_tree_loc['pid']}", array('query' => array('path'=>$main_path)));
+    $links = array($link);
+  }
+
   
-  $header = '<h3>' . t('Parent concepts') . '</h3>';
-  $links = array_map(
-    function($o) { 
-      global $main_path;
-      return l($o['label'], "fedora/repository/{$o['pid']}", array('query' => array('path'=>$main_path))); 
-    },
-    si_exhibition_get_parent_info_by_id($pid, TRUE)
-  );
   $item_list_array = array(
     'items'=>$links,
     'title'=>NULL,
     'type'=>'ul',
     'attributes'=>array('class' => 'parent-concepts'),
   );
-  return $header . (empty($links) ? t('This item has no parent concepts.') : theme('item_list', $item_list_array));
+  return $header . (empty($links) ? t('This item is the root of the exhibition.') : theme('item_list', $item_list_array));
 }
 
 /**
@@ -299,13 +316,14 @@ function theme_si_exhibition_child_concepts($vars){
   }else{
     $main_path .= ','.$pid;
   }
-  $make_link = function($o) {
+  $make_link = function($child) {
     global $main_path;
-    return l($o['label'] . (($o['count'] > 0) ? " ({$o['count']})" : ''), "fedora/repository/{$o['pid']}", array('query' => array('path'=>$main_path))); 
+    if (strtolower($child['type']) == 'resource') return NULL;
+    return l($child['label'], "fedora/repository/{$child['pid']}", array('query' => array('path'=>$main_path)));
   };
+  $vo = si_exhibition_get_visibility_object($pid);
+  $links = array_filter(array_map($make_link, $vo['children']));
   
-  $links = array_map($make_link,  si_exhibition_get_child_concept_info_by_id($pid));
-  //var_dump($links);
   $item_list_array = array(
     'items'=>$links, 
     'title'=>NULL, 
@@ -323,6 +341,7 @@ function HandleXmlError($errno, $errstr, $errfile, $errline)
 {
   if ($errno==E_WARNING && (substr_count($errstr,"DOMDocument::loadXML()")>0))
   {
+    watchdog("exhibition",'HandleXmlError:'.$errstr);
     throw new DOMException($errstr);
   }
   else 
@@ -340,6 +359,7 @@ function theme_si_exhibition_metadata_xmls($vars){
   if (variable_get('si_exhibition_anonymous_only', FALSE)){
     if (!si_exhibition_check_view_permission($pid)){
       si_exhibition_debug('view_permission was false');
+      watchdog("exhibition","watchdog view_permission was false:".$pid);
       drupal_not_found();
       return;
     }
@@ -349,6 +369,7 @@ function theme_si_exhibition_metadata_xmls($vars){
     //The page may be showing the metadata on a portion of the page and not a page of only metadata
     //If that is the case, just return without indication that metadata is not shown.
     si_exhibition_debug('empty visibility object or show_meta empty:'.$pid);
+    watchdog("exhibition",'empty visibility object or show_meta empty:'.$pid);
     return '';
   }
   $rows = si_models_get_display_xmls($pid);
@@ -360,6 +381,7 @@ function theme_si_exhibition_metadata_xmls($vars){
   if ($xsl_string === FALSE){
     //No XSL string (bad news)
     drupal_set_message("Configuration problem, could not obtain XSL information from configured XSL provider. This usually means the exhibition server cannot contact the workbench server.", "error");
+    watchdog("exhibition",'xsl_string was bad for:'.$pid);
     return '';
   }
   try{
@@ -369,6 +391,7 @@ function theme_si_exhibition_metadata_xmls($vars){
   }catch(Exception $e){
     dsm($e);
     dsm($xsl_string);
+    watchdog("exhibition",'xsl_string could not load for:'.$pid);
     return '';
   }
 
@@ -377,24 +400,24 @@ function theme_si_exhibition_metadata_xmls($vars){
   if (strpos($datastream_content, '<?xml version=') === false) {
     $docToLoad = ('<?xml version="1.0" encoding="UTF-8"?'.'>'.$datastream_content);
   }  
-	$doc->loadXML($docToLoad);
+  $doc->loadXML($docToLoad);
   if (!empty($_GET['output'])){
-	  if ($_GET['output'] == 'xslSaved'){
-	    print $doc->saveXML();
-	    exit();
-	  }
-	  if ($_GET['output'] == 'xml'){
-	    print $docToLoad;
-	    exit();
-	  }
-	  
-	  if ($_GET['output'] == 'phpTransform'){
-	    print $xsl->transformToXML($doc);
-	    exit();
-	  }
-	  if ($_GET['output'] == 'xsl'){
-	    print si_exhibition_xsl_string();
-	    exit();
+    if ($_GET['output'] == 'xslSaved'){
+      print $doc->saveXML();
+      exit();
+    }
+    if ($_GET['output'] == 'xml'){
+      print $docToLoad;
+      exit();
+    }
+  
+    if ($_GET['output'] == 'phpTransform'){
+      print $xsl->transformToXML($doc);
+      exit();
+    }
+    if ($_GET['output'] == 'xsl'){
+      print si_exhibition_xsl_string();
+      exit();
     }
   }
   $initialOutput = $xsl->transformToXML($doc);
