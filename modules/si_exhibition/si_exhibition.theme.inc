@@ -324,6 +324,9 @@ function theme_si_exhibition_child_concepts($vars){
   };
   $vo = si_exhibition_get_visibility_object($pid);
   if (empty($vo)) return '';
+  if (empty($vo['children'])) {
+    $vo['children'] = array();
+  }
   $links = array_filter(array_map($make_link, $vo['children']));
   
   $item_list_array = array(
