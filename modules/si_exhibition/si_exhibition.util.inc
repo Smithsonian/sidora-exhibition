@@ -78,7 +78,12 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
       foreach($curr_children as $curr_child) {
         if ($curr_child['pid'] == $curr_pid) {
           $found_next_child = TRUE;
-          $next_children = $curr_child['children'];
+          if (array_key_exists('children', $curr_child)) {
+            $next_children = $curr_child['children'];
+          }
+          else {
+            $next_children = array(); 
+          }
           $curr_parent = $curr_child;
         }
       }
@@ -465,27 +470,29 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
     //The visibility object needs to exist to pull info from it
     return NULL;
   }
-  foreach($vis_obj['children'] as $child_vis_obj) {
-    if (
-        !empty($child_vis_obj['pid']) && 
-        !empty($child_vis_obj['show_name']) && 
-        !empty($child_vis_obj['type']) && 
-        !empty($child_vis_obj['model']) && 
-        !empty($child_vis_obj['label']) && 
-        (strtolower($child_vis_obj['type']) == 'resource')
-       ) {
-      $add_current_resource = FALSE;
-      foreach($resource_types as $user_selected_resource_model) {
-        $current_obj_model = $child_vis_obj['model'];
-        if ($current_obj_model == $user_selected_resource_model) {
-          $add_current_resource = TRUE;
+  if (array_key_exists('children', $vis_obj)) {
+    foreach($vis_obj['children'] as $child_vis_obj) {
+      if (
+          !empty($child_vis_obj['pid']) && 
+          !empty($child_vis_obj['show_name']) && 
+          !empty($child_vis_obj['type']) && 
+          !empty($child_vis_obj['model']) && 
+          !empty($child_vis_obj['label']) && 
+          (strtolower($child_vis_obj['type']) == 'resource')
+         ) {
+        $add_current_resource = FALSE;
+        foreach($resource_types as $user_selected_resource_model) {
+          $current_obj_model = $child_vis_obj['model'];
+          if ($current_obj_model == $user_selected_resource_model) {
+            $add_current_resource = TRUE;
+          }
         }
-      }
-      if (empty($resource_types)) {  //Indicates "All" is selected
-        $add_current_resource = TRUE; 
-      }
-      if ($add_current_resource) {
-        $resources[] = array('pid' => $child_vis_obj['pid'], 'label' => $child_vis_obj['label']);
+        if (empty($resource_types)) {  //Indicates "All" is selected
+          $add_current_resource = TRUE; 
+        }
+        if ($add_current_resource) {
+          $resources[] = array('pid' => $child_vis_obj['pid'], 'label' => $child_vis_obj['label']);
+        }
       }
     }
   }
