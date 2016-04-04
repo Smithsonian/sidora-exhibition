@@ -1,4 +1,5 @@
 <?php
+$GLOBALS['print_debug_lines'] = FALSE;
 /**
  * @file
  *
@@ -69,10 +70,16 @@ function si_exhibition_menu() {
       'access callback' => true,
       'type' => MENU_CALLBACK,
     ),
-		'fedora/download/%' => array(
+    'fedora/download/%' => array(
       'description' => 'Overrides the islandora call to a Fedora repository',
       'page callback' => 'si_exhibition_get_obj_datastream_content',
-			'page arguments' => array(2),
+      'page arguments' => array(2),
+      'access callback' => true,
+      'type' => MENU_CALLBACK,
+    ),
+    'forward_open_access' => array(
+      'description' => 'Forwards a call directly to the open_access workbench',
+      'page callback' => 'si_exhibition_forward_open_access',
       'access callback' => true,
       'type' => MENU_CALLBACK,
     ),
@@ -244,29 +251,27 @@ function si_exhibition_block_view($delta='') {
 
   // Only ever display in /fedora/* when the user has access and the resource exists.
   if (arg(0) == 'fedora' && !$forbidden && !$not_found) {
-    $pid_for_config = arg(2);
+    $pid_for_config = array_shift(si_exhibition_get_pid_path_to_showing_concept());
     $pid = (arg(2) ? arg(2) : variable_get('fedora_repository_pid', 'si:root'));
-    $repo = tuque_wrapper_get_repository_instance();
-    si_exhibition_debug('repo from si_exhibition_block_view');
-    $object = $repo->getObject($pid); // We know it exists if we got passed the header checks
     
     switch ($delta) {
       case "seu_nav":
         $block = array(
           'subject' => t('SI Navigation'),
-          'content' => theme('si_exhibition_navigation', array('object'=>$object)),
+          'content' => theme('si_exhibition_navigation', array('pid'=>$pid)),
         );
+        dsm("seu_nav");
         break;
       case "seu_parent":
         $block = array(
           'subject' => t('SI Parent Concepts'),
-          'content' => theme('si_exhibition_parent_concepts', array('object'=>$object)),
+          'content' => theme('si_exhibition_parent_concepts', array('pid'=>$pid)),
         );
         break;
       case "seu_child":
         $block = array(
           'subject' => t('SI Child Concepts'),
-          'content' => theme('si_exhibition_child_concepts', array('object'=>$object)),
+          'content' => theme('si_exhibition_child_concepts', array('pid'=>$pid)),
         );
         break;
       default:
@@ -292,14 +297,26 @@ function si_exhibition_block_view($delta='') {
     return $block;
   }
 }
-
+function _si_current_pid_to_show() {
+  $pid_for_config = NULL;
+  $path = filter_input(INPUT_GET, 'path');
+  //if we have a path, make sure we can access that path
+  if (!empty($path)){
+    $path_list = explode(',',$path);
+    if (!empty($path_list[0])){
+      $pid_for_config = $path_list[0];
+    }
+  }
+  if (empty($pid_for_config)) return arg(2);
+  return $pid_for_config;
+}
 /*
  * Return if this exhibition should be shown
  */
 function _si_show_exhibition(){
+  $pid_on_url = arg(2); 
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $path = filter_input(INPUT_GET, 'path');
-  $pid_on_url = arg(2); 
 
   //Start cache check for return
   $cache_name = 'show_exhibition';
@@ -326,7 +343,17 @@ function _si_show_exhibition(){
   }
   $bad_path_set = TRUE;
   $to_return = !($bad_path);
-  return si_exhibition_cache($cache_name, $cache_index, $to_return);
+  $cached = si_exhibition_cache($cache_name, $cache_index, $to_return);
+  /*
+    var_dump($path_list);
+    var_dump($tree);
+    print "TPL:";
+    var_dump($tree_pid_list);
+    var_dump($bad_path);
+    var_dump($cached);
+    exit();
+  */
+  return $cached;
 }
 
 
@@ -342,15 +369,7 @@ function si_exhibition_preprocess_page(&$variables) {
     $variables['theme_hook_suggestions'][] = 'page_exhibition';
     $variables['title'] = NULL; // Title is displayed as part of the page content.
     $se = array();
-    $pid_for_config = arg(2);
-    $path = filter_input(INPUT_GET, 'path');
-    //if we have a path, make sure we can access that path
-    if (!empty($path)){
-      $path_list = explode(',',$path);
-      if (!empty($path_list[0])){
-        $pid_for_config = $path_list[0];
-      }
-    }
+    $pid_for_config = array_shift(si_exhibition_get_pid_path_to_showing_concept());
     try {
       $se = si_exhibition_get_item_display_config($pid_for_config, arg(2));
       if ($se['error'] == true) {
@@ -359,15 +378,16 @@ function si_exhibition_preprocess_page(&$variables) {
       //logo is the image
       //site_slogan is under the name
       //site_name is the main name
-      if (array_key_exists('logo', $se)) $variables['logo'] = $se['logo']; else $variables['logo'] = '';
-      if (array_key_exists('title', $se)) $variables['site_name'] = $se['title']; else $variables['site_name'] = '';
-      //$variables['site_slogan'] = ' sitey slogany'.arg(2);
-      $variables['sidora_exhibition'] = $se;
-      $variables['primary_links_tree'] = drupal_render(menu_tree_output(menu_tree_all_data('main-menu')));
+      if (!empty($se)){
+        if (array_key_exists('logo', $se)) $variables['logo'] = $se['logo']; else $variables['logo'] = '';
+        if (array_key_exists('title', $se)) $variables['site_name'] = $se['title']; else $variables['site_name'] = '';
+        //$variables['site_slogan'] = ' sitey slogany'.arg(2);
+        $variables['sidora_exhibition'] = $se;
+        $variables['primary_links_tree'] = drupal_render(menu_tree_output(menu_tree_all_data('main-menu')));
+      }
     } catch(Exception $e) {
-      print ('exception'.$e->getMessage().'  '.$e->getTraceAsString());//BBB
+      watchdog('exhibition', 'si_exhibition_preprocess page exception:'.$e->getMessage().'  '.$e->getTraceAsString());
       exit();
-      $show_exhibition = false;
     }
   }
 }
@@ -378,6 +398,110 @@ function si_exhibition_preprocess_page(&$variables) {
 function si_exhibition($pid = NULL, $dsid = NULL) {
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $pid = isset($pid) ? $pid : variable_get('fedora_repository_pid', 'si:root');
+  $object = sidora_obj($pid);
+  drupal_add_css(drupal_get_path('module', 'si_exhibition') . '/css/si-exhibition.css');
+  $jstreepath = variable_get('sidora_js_lib_location_jstree', '');
+  drupal_add_css($jstreepath . 'themes/default/style.min.css', array('type' => 'external'));
+  if (variable_get('si_exhibition_anonymous_only', FALSE)){
+    if (!si_exhibition_check_view_permission($pid)){
+      watchdog('exhibition', 'si_exhibition_check_view_permission for:'.$pid.' was false');
+      si_exhibition_debug('View permission false:'.$pid);
+      if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
+      return MENU_NOT_FOUND;
+    }
+  }
+  if (!_si_show_exhibition()){
+    watchdog('exhibition', '_si_show_exhibition for:'.$pid.' was false');
+    si_exhibition_debug('Show exhibition explicitly false:'.$pid);
+    if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
+    return MENU_NOT_FOUND; //drupal_not_found();
+  }
+
+  //Something should either be viewable via the xsl or downloadable with a file extension
+  $xsl_config = si_exhibition_forward_direct_open_access(array('xsl_config', $pid), TRUE, FALSE);
+  $file_extension = si_exhibition_forward_direct_open_access(array('file_extension', $pid), TRUE, FALSE);
+  if (empty($xsl_config) && empty($file_extension)){
+    si_exhibition_debug('xsl_config or file_extention empty:'.$pid);
+    if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
+    return MENU_NOT_FOUND;
+  }
+
+
+  //"Magic" value "sidora_viewer" will use the viewer settings
+  if ($dsid != NULL && !empty($object) && (!empty($object[$dsid]) || $dsid == 'sidora_viewer' )) {
+    //RELS-EXT should never be able to be downloaded.  It contains too much structural information that may need
+    //to be hidden
+    if ($dsid == 'RELS-EXT') {
+      si_exhibition_debug('Not allowed to use viewer directly on RELS-EXT datastream:'.$pid);
+      if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
+      return MENU_NOT_FOUND;
+    }
+
+    //OBJ is special since that is to download the item, don't allow the OBJ datastream for
+    //the generic previews
+    if ($dsid == 'OBJ') {
+      si_exhibition_debug('Not allowed to use viewer directly on OBJ datastream:'.$pid);
+        if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
+      return MENU_NOT_FOUND;
+    }
+
+    require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
+    $vis_obj = si_exhibition_get_visibility_object($pid);
+    if (empty($vis_obj) || empty($vis_obj['show_preview'])) {
+      si_exhibition_debug('Visibility object empty or show_preview was empty');
+      if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
+      //  print $pid;
+      //  var_dump($vis_obj);
+      return MENU_NOT_FOUND;
+    }
+    
+    $xsl_config = si_exhibition_forward_direct_open_access(array('xsl_config', $pid), TRUE, FALSE);
+    if (!empty($xsl_config) && !empty($xsl_config->dsid)) {
+      $specific_meta = $xsl_config->dsid;
+      //This is the datastream that is considered for "show meta" so should only be allowed if show meta is allowed
+      //In order to get through to show the direct meta, the setting must be "show_meta" (this code) and "show_preview" (lines above) as true
+      if (empty($vis_obj['show_meta']) && ((string)$dsid === (string)$specific_meta)) {
+        si_exhibition_debug('Show meta is not true, and the datastream requested is considered the metadata datastream:'.$pid.' '.$dsid);
+        if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
+        return MENU_NOT_FOUND;
+      }
+    }
+
+    //All others that come here are the "previews"
+
+    //Here we know we "should" be able to see it
+    if ($dsid == 'sidora_viewer'){
+      si_exhibition_sidora_viewer($object);
+    }
+    else {
+      //print $dsid;//$object[$dsid]->size;
+      $datastream = $object[$dsid];
+      //var_dump($datastream);
+      //var_dump($object);
+      //$datastream->populateDatastreamInfo();
+      //$datastream->refresh();
+
+      $datastream = $object[$dsid];
+      $content = $datastream->content;
+
+      if (isset($_SERVER['HTTP_RANGE'])) {
+       si_exhibition_deliver_streaming($pid, $dsid);
+       exit();
+      }
+      header("Content-Type: ".$object[$dsid]->mimetype);
+      print $object[$dsid]->content;
+    }
+    exit();
+  }
+  if (!empty($object)){
+    return theme('si_exhibition_object', array('object'=>$object));
+    drupal_exit();
+  }else{
+    return MENU_NOT_FOUND;
+  }
+  
+}
+function sidora_obj($pid){
   $repo = tuque_wrapper_get_repository_instance();
   si_exhibition_debug('repo from si_exhibition');
   // Check if we can access the repository and the requested object.
@@ -393,7 +517,9 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
           drupal_set_message(t('The Fedora repository server is currently unavailable. Please contact the site administrator.'), 'error', FALSE);
         }
         watchdog('exhibition', '404 error getting pid:'.$pid.'.');
-        drupal_not_found();
+        //dsm('Could not reach Fedora');
+        //drupal_not_found();
+        if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
         break;
       case '401':
       case '403':
@@ -413,39 +539,141 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
           '%line' => $caller['line']
         );
         watchdog('islandora', $message, $variables, WATCHDOG_ERROR, NULL);
-        drupal_not_found();
+        //dsm('Islandora error');
+        //drupal_not_found();
+        if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
         break;
     }
     exit();
   }
-  drupal_add_css(drupal_get_path('module', 'si_exhibition') . '/css/si-exhibition.css');
-  drupal_add_css(drupal_get_path('module', 'si_exhibition') . '/js/jstree/dist/themes/default/style.min.css');
-  if (variable_get('si_exhibition_anonymous_only', FALSE)){
-    if (!si_exhibition_check_view_permission($pid)){
-      watchdog('exhibition', 'si_exhibition_check_view_permission for:'.$pid.' was false');
-      return drupal_not_found();
+  return $object;
+}
+function si_exhibition_sidora_viewer($object){
+  global $base_url;
+  $pid = $object->id;
+  $viewer_config = si_exhibition_forward_direct_open_access(array('viewer_config', $object->id), FALSE, FALSE);
+  if (empty($viewer_config)) {
+    watchdog('exhibition','No viewer config for:'.$pid);
+    drupal_exit();
+  }
+  module_load_include('inc', 'si_exhibition', 'includes/workbench_viewers');
+  $viewer = $viewer_config->viewer_id;
+    switch ($viewer) {
+      case 'pdfjs':
+        drupal_goto(variable_get('sidora_pdf_js_location','').'?file='.$base_url.'/fedora/repository/'.$pid.'/OBJ');
+        drupal_exit();
+        break;
+      case 'IDS':
+        sidora_view_ids_iframe($pid, $dsid);
+        break;
+      case 'OpenSeaDragon':
+        sidora_view_openseadragon($pid, 'OBJ', '0');
+        break;
+      case 'PHPExcel':
+        sidora_tabular_view_phpexcelreader($pid,'OBJ');
+        break;
+      case 'JW Audio Player':
+        si_exhibition_jw_player($pid, 'PROXY_MP3/file_name_spoof.mp3');
+        break;
+      case 'JW Video Player':
+        si_exhibition_jw_player($pid, 'MP4/file_name_spoof.mp4');
+        break;
+      default:
+        echo $viewer;
+        break;
     }
-  }
-  if (!_si_show_exhibition()){
-    watchdog('exhibition', '_si_show_exhibition for:'.$pid.' was false');
-    return drupal_not_found();
-  }
-  if ($dsid != NULL && !empty($object) && !empty($object[$dsid])) {
-    //Moved this section down from the top 1/27/2015 BBB
-    //Here we know we "should" be able to see it
-    header("Content-Type: ".$object[$dsid]->mimetype);
-    print $object[$dsid]->content;
-    exit();
-    //return call_user_func_array('repository_page', func_get_args()); // Use the default datastream download code.
-  }
-  if (!empty($object)){
-    return theme('si_exhibition_object', array('object'=>$object));
-    exit();
-  }else{
-    print "not found";
-    exit();
-  }
   
+  exit();
+}
+function si_exhibition_jw_player($pid, $file_path){
+  if (strpos($pid, ':') !== FALSE) $pid = urlencode($pid);
+  global $base_url;
+  print '
+<script type="text/javascript" src="' . $base_url . '/' . libraries_get_path('jwplayer') . '/jwplayer.js"></script>
+<script type="text/javascript">
+document.addEventListener("DOMContentLoaded",function() {
+  jwplayer("mediaplayer").setup({
+    file: "'.$base_url.'/fedora/repository/'.$pid.'/'.$file_path.'",
+    image: "'.$base_url.'/fedora/repository/'.$pid.'/TN",
+    width: "480",
+    height: "270"
+  });
+});
+</script>
+<div style="width:100%;height:100%;">
+  <div style="background-color: #F2F2F2;  border: 1px solid #ddd;  -webkit-border-radius: 5px;  -moz-border-radius: 5px;  border-radius: 5px;  padding: 15px;  width: 480px;  max-width: 100%;margin: auto;/* height: 100px; */position: relative;top: 50%;transform: translateY(-50%);">
+    <div id="mediaplayer">Loading JW Player...</div>
+  </div>
+</div>
+';
+
+}
+/*
+ * The hook_menu call for open_access calls from the browser (javascript)
+ */
+function si_exhibition_forward_open_access($access_type, $pid = ''){
+  return si_exhibition_forward_direct_open_access( array( $access_type, $pid ) ); 
+}
+/*
+ * Used by the code to make direct calls to the workbench open_access protocol
+ */
+function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $exit = TRUE, $get_params = TRUE){
+  //Pull the info about the viewer for the object
+  
+  $url_to_get = variable_get('si_exhibition_workbench_xsl', '');
+  $url_to_get .= implode('/' , array_map('urlencode',$callback_args));
+  if ($get_params){
+    $url_to_get .= '?' . $_SERVER['QUERY_STRING'];
+  }
+  $ch = curl_init();
+  $timeout = 60;
+  curl_setopt($ch, CURLOPT_URL, $url_to_get);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+  $data = curl_exec($ch);
+
+  if ($data === FALSE){
+    $curl_error_string = curl_error($ch);
+    print 'Could not obtain data from:'.$url_to_get.'<br/>'."\n";
+    print $curl_error_string.'<br/>'."\n";
+    $info = curl_getinfo($ch);
+    print_r ($info);
+    curl_close($ch);
+    $se = array();
+    $se['error'] = $curl_error_string;
+    $_REQUEST['store_pid_config_'.$pid] = $se;
+    if ($exit) {
+      watchdog('exhibition','Open access errored on:'.$url_to_get);
+      drupal_exit();
+    }
+    return $se;
+  }
+      /*
+      ob_start();
+      print "Success on open access call\n";
+      var_dump($ch);
+      var_dump(curl_error($ch));
+      var_dump(curl_getinfo($ch));
+      $debug_result = ob_get_clean();
+      si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+      */
+
+  curl_close($ch);
+  if ($raw){
+    if ($exit) {
+      print ($data);
+      drupal_exit();
+    }
+    return $data;
+  }
+  $se = json_decode($data);
+  if ($exit) {
+    drupal_exit();
+  }
+  return $se;
 }
 /*
  * Intended to determine if this should be viewable, but right now 
@@ -464,7 +692,11 @@ function si_exhibition_check_view_permission($object_pid) {
   if($object_pid == 'undefined' || !$object_pid) {
     $object_pid = variable_get('fedora_repository_pid', 'islandora:top');
   }
- return true; //BBB remove the xacml code??
+  
+  return true;
+  /*
+  XACML code unused
+
   $object = new Fedora_Item($object_pid);
   if(!$object->exists()) {
     return false;
@@ -494,9 +726,9 @@ function si_exhibition_check_view_permission($object_pid) {
     }
   }
   return false;
+  */
 }
-function si_exhibition_meta_string_for_xslt($object){
-  $pid = $object->id;
+function si_exhibition_meta_string_for_xslt_by_id($pid){
   $xsl_config = '';
   if (!empty($pid)){
     $url_to_get =
@@ -527,6 +759,16 @@ function si_exhibition_meta_string_for_xslt($object){
       $_REQUEST['store_pid_config_'.$pid] = $se;
       return $se;
     }
+      /*
+      ob_start();
+      print "Success on meta string for xslt\n";
+      var_dump($ch);
+      var_dump(curl_error($ch));
+      var_dump(curl_getinfo($ch));
+      $debug_result = ob_get_clean();
+      si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+      */
+
     curl_close($ch);
     $xsl_config = json_decode($data);
 
@@ -536,6 +778,7 @@ function si_exhibition_meta_string_for_xslt($object){
     $specific_meta = $xsl_config->dsid;
   }
   $datastream_content = '';
+  $object = sidora_obj($pid);
   if (empty($specific_meta)){
     foreach($object as $dsid_loop=>$datastream_loop){
       //strip off the <?xml directives if it has any and remove binary data
@@ -557,6 +800,14 @@ function si_exhibition_meta_string_for_xslt($object){
  *
  */
 function si_exhibition_custom_url($cu) {
+  require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
+  if ($cu == 'test')  {
+    var_dump( si_exhibition_get_visibility_tree(''));
+    var_dump(si_exhibition_get_pid_path_to_showing_concept());
+    print '<a href="./si:valid?path=si:1,h:2,y:3">go</a> ';
+    print '<a href="./download">nogo</a>';
+    drupal_exit();
+  }
   $url =
     variable_get('si_exhibition_data_url', '').
     'custom_url'.'/'.
@@ -606,6 +857,29 @@ function si_exhibition_xsl_string($pid){
       $_REQUEST['store_pid_config_'.$pid] = $se;
       return FALSE;
     }
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    if($httpCode == 404) {
+      /*
+      ob_start();
+      print "404 on call to get XSL\n";
+      var_dump($ch);
+      var_dump(curl_error($ch));
+      var_dump(curl_getinfo($ch));
+      $debug_result = ob_get_clean();
+      si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+      */
+      //dsm("404'd: $url_to_get");
+      return FALSE;
+    }
+    /*
+    ob_start();
+    print "Successful call to get XSL\n";
+    var_dump($ch);
+    var_dump(curl_error($ch));
+    var_dump(curl_getinfo($ch));
+    $debug_result = ob_get_clean();
+    si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+    */
     curl_close($ch);
     $my_xsl = $data;
 
@@ -1597,22 +1871,13 @@ function si_exhibition_get_datastream_as_json() {
   $pid = $_GET['pid'];
   $dsid = $_GET['dsid'];
   // List of viewable data streams directly from the URL
-  $theme = array('TEXT' => 'si_exhibition_text_datastream', 'CSV' => 'si_exhibition_csv_datastream', 'METADATA' => 'si_exhibition_metadata', 'METADATA_XMLS' => 'si_exhibition_metadata_xmls');
-  $repo = tuque_wrapper_get_repository_instance();
-  //si_exhibition_debug('repo from si_exhibition_get_datastream_as_json');
-  $object = $repo->getObject($pid); // If listed in the resources we know we already have access to it.
-  $output = isset($theme[$dsid]) ? theme($theme[$dsid], array('object'=>$object)) : t('An Error Occured.');
-  /*
-  if ($dsid == 'METADATA_XMLS'){
-    header('Content-Type: text/xml');
-    print '<?xml version="1.0" encoding="UTF-8"?>
-<?xml-stylesheet type="text/xsl" href="xsl/metadata-display.xsl"?>
-';
-    print $output;
-  }else
-  */
-    print json_encode(array('output' => $output));
-  exit();
+  $theme = array(
+    'METADATA' => 'si_exhibition_metadata', 
+    'METADATA_XMLS' => 'si_exhibition_metadata_xmls'
+  );
+  $output = isset($theme[$dsid]) ? theme($theme[$dsid], array('pid'=>$pid)) : t('An Error Occured.');
+  print json_encode(array('output' => $output));
+  drupal_exit();
 }
 
 /**
@@ -1651,18 +1916,49 @@ function si_exhibition_update_js(&$variables) {
 
   // Put a new jquery into core
   $modulepath = drupal_get_path('module', 'si_exhibition');
+  $jstreepath = variable_get('sidora_js_lib_location_jstree', '');
   drupal_add_js($modulepath.'/js/jquery-1.11.0.min.js');
   drupal_add_js($modulepath.'/js/jquery.browser.compat.js');
   drupal_add_js($modulepath.'/js/jquery.once.min.js');
-  drupal_add_js($modulepath.'/js/jstree/dist/jstree.min.js');
+  drupal_add_js($jstreepath.'jstree.min.js');
   drupal_add_js($modulepath.'/js/si_exhibition.js');
 }
+/*
+ * Add the ability to debug the curl requests
+ */
+function si_exhibition_sidora_debug($debug_string, $cgi = NULL) {
+  $debug_string .= microtime();
+  $sidora_debug = !empty($_GET['sidora_debug']);
+  if ($sidora_debug) $sidora_debug = $_GET['sidora_debug']; 
+  if ($cgi != NULL) {
+    if (!empty($_GET['sidora_filter_timing'])) {
+      $sidora_filter_timing = $_GET['sidora_filter_timing'];
+      if (!empty($cgi['starttransfer_time'])) {
+        if (floatval($sidora_filter_timing) > floatval($cgi['starttransfer_time'])) {
+         return;
+        }
+      }
+    }
+  }
+  if ($sidora_debug == 'screen') {
+    print $debug_string;
+  }
+  if ($sidora_debug == 'watchdog') {
+    if (function_exists('watchdog')) {
+      watchdog('SidoraTuque',$debug_string);
+    }else{
+      print "Watchdog does not exist\n$debug_string";
+    }
+  }
+}
+
 /*
  * Return the display configuration object
  * If it's not already stored for this call, go get it from the exhibition_config server
  * Will return NULL on errors and may set drupal error messages during the error processing
  */
-function si_exhibition_get_item_display_config($pid,$nav_to_pid){
+function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_messages = TRUE){
+  
   $path = filter_input(INPUT_GET, 'path');
   $pid_on_url = arg(2); 
 
@@ -1697,8 +1993,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
     curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
   $data = curl_exec($ch);
   
-  //echo 'si_exhibition.module: line 1534<br><pre>' . print_r($data, true) . '</pre>';
-  
+  $curl_error_string = ''; 
   if ($data === FALSE){
     $curl_error_string = curl_error($ch);
     print 'Could not obtain data from:'.$url_to_get.'<br/>'."\n";
@@ -1712,16 +2007,26 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
     $to_return = $se;
     return si_exhibition_cache($cache_name, $cache_index, $to_return);
   }
+    /*
+    ob_start();
+    print "Successful call to Exhibition_config\n";
+    var_dump($ch);
+    var_dump($curl_error_string);
+    var_dump(curl_getinfo($ch));
+    $debug_result = ob_get_clean();
+    si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+    */
+
+
   curl_close($ch);
   $my_json = $data;
   $se = json_decode($my_json,true);
-  if ($se['error'] === TRUE){
-    drupal_set_message(t('This item is unavailable for view. You may attempt downloading.'), 'error', FALSE);
-    $to_return = null;
-    return si_exhibition_cache($cache_name, $cache_index, $to_return);
+  if (!empty($se['error'])){
+    //No longer give download message, instead fully hide the data.  drupal_not_found() produces infinite loop
+    watchdog('exhibition','Exhibition Config indicated this is not a good item to get:'.$url_to_get);
+    drupal_exit();
   }
   if (isset($se['nav_type']) && $se['nav_type'] == 'tree'){
-    $block = module_invoke('si_exhibition', 'block_view', 'seu_nav');
     //See if the tree should start on the current node or if there is a path
     //if we have a path, make sure we can access that path
     $tree = NULL;
@@ -1736,9 +2041,11 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
         $tree = _si_exhibition_get_pid_tree($path_list[0], null, $tree_pid_list);
         if (!in_array($pid_on_url,$tree_pid_list)){
           watchdog('exhibition','Bad tree structure');
-          drupal_not_found();
-          $to_return = null;
-          return si_exhibition_cache($cache_name, $cache_index, $to_return);
+          si_exhibition_debug('Bad tree structure, not going to show it');
+          if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
+          //drupal_not_found() goes into infinite loop here
+          //drupal_exit() goes into infinite loop here
+          exit();
         }
       }
     }
@@ -1750,10 +2057,10 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
      $to_print = '<h2 class="title block-title">SI Navigation</h2>';
      $to_print .= theme('si_exhibition_navigation', array('object'=>$object));
   }
-  if ($se['nav_location'] == 'left') $se['seu_nav_first'] = $to_print;//$block['content'];
-  if ($se['nav_location'] == 'right') $se['seu_nav_last'] = $to_print; //$block['content'];
-  if ($se['nav_location'] == 'bleft') $se['seu_nav_first_bottom'] = $to_print;//$block['content'];
-  if ($se['nav_location'] == 'bright') $se['seu_nav_last_bottom'] = $to_print; //$block['content'];
+  if ($se['nav_location'] == 'left') $se['seu_nav_first'] = $to_print;
+  if ($se['nav_location'] == 'right') $se['seu_nav_last'] = $to_print;
+  if ($se['nav_location'] == 'bleft') $se['seu_nav_first_bottom'] = $to_print;
+  if ($se['nav_location'] == 'bright') $se['seu_nav_last_bottom'] = $to_print;
   $_REQUEST['store_pid_config_'.$pid] = $se;
   $to_return = $se;
   return si_exhibition_cache($cache_name, $cache_index, $to_return);
@@ -1762,11 +2069,11 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid){
  * Returns a SIdora tree in html format
  */
 function si_exhibition_get_printable_tree($tree_pos, $current_path = ''){
-  $label = $tree_pos['object']->label;
+  $label = $tree_pos['label'];
   if (empty($label)){
     print_r($tree_pos);
   }
-  $output = '<li><a href="'.base_path().'fedora/repository/'.$tree_pos['pid'].'?path='.$current_path.'">'.$tree_pos['object']->label;
+  $output = '<li><a href="'.base_path().'fedora/repository/'.$tree_pos['pid'].'?path='.$current_path.'">'.$tree_pos['label'];
   if (isset($tree_pos['already_in_tree']) && $tree_pos['already_in_tree']){
     $output .= '*';
   }
@@ -1782,10 +2089,126 @@ function si_exhibition_get_printable_tree($tree_pos, $current_path = ''){
   $output .= '</li>';
   return $output;
 }
+/**
+ * Return an associative array of the visibility for the input pid
+ * $pid - the Fedora ID, if NULL pulls from the assumed root of tree
+ * The array is similar to this example:
+{
+  'pid':'si-user:126',
+  'label':'randerson6',
+  'type':'concept',
+  'show_meta':true,
+  'children':[{
+    'pid':'si:12345',
+    'name':'Image 1',
+    'type':'resource',
+    'show_meta':false,
+    'show_preview':true,
+    'allow_download':false
+  },{
+    'pid':'si:12346',
+    'name':'Incomplete folder, will hold more info later',
+    'type':'concept',
+    'show_meta':false,
+    'children':[{
+      'pid':'si:12347',
+      'name':'CSV filled with data',
+      'type':'resource',
+      'show_meta':true,
+      'show_preview':true,
+      'allow_download':true
+    }]
+  }]
+}
+
+ */
+function si_exhibition_get_visibility_tree($pid = NULL) {
+  if ($pid === NULL) {
+    $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+    if (!empty($parent_pid_path)){
+      $pid = $parent_pid_path[0];
+    }
+  }
+  $url_to_get = variable_get('si_exhibition_visibility_info_url', '') . urlencode($pid);
+  if (array_key_exists($url_to_get, $GLOBALS)) {
+    return $GLOBALS[$url_to_get];
+  }
+  $ch = curl_init();
+  $timeout = 60;
+  curl_setopt($ch, CURLOPT_URL, $url_to_get);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+  $data = curl_exec($ch);
+  if ($data === FALSE){
+    /*
+    ob_start();
+    print "Error on visibility tree call\n";
+    var_dump($ch);
+    var_dump($curl_errori($ch));
+    var_dump(curl_getinfo($ch));
+    $debug_result = ob_get_clean();
+    si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+    */
+
+    $curl_error_string = curl_error($ch);
+   // print_t('Could not obtain data from:'.$url_to_get);
+    print $curl_error_string.'<br/>'."\n";
+    $info = curl_getinfo($ch);
+    print_r($info);
+    curl_close($ch);
+    $GLOBALS[$url_to_get] = NULL;
+    return $GLOBALS[$url_to_get];
+  }
+  ob_start();
+  print "Success on visibility tree call\n";
+  var_dump($ch);
+  var_dump(curl_error($ch));
+  var_dump(curl_getinfo($ch));
+  var_dump($data);
+  $debug_result = ob_get_clean();
+  si_exhibition_debug($debug_result, curl_getinfo($ch));
+
+  curl_close($ch);
+ 
+  
+  $GLOBALS[$url_to_get] = json_decode($data, TRUE);
+  ob_start();
+  print "Returning visibility object\n";
+  var_dump ($GLOBALS[$url_to_get]);
+  $debug_result = ob_get_clean();
+  si_exhibition_debug($debug_result);
+
+  return $GLOBALS[$url_to_get];
+}
 /*
+ * The tree looks like this:
+{
+  ['pid'] = $pid
+  ['label'] = Fedora object label
+  ['children'] = array(
+    {
+      ['pid'] = 'si:child1',
+      ['label'] = Fedora object label
+      ['children'] = array()
+    },{
+      ['pid'] = 'si:child2',
+      ['label'] = Fedora object label
+      ['children'] = array()
+    },{
+      ['pid'] = 'si:child2',
+      ['label'] = Fedora object label
+      ['children'] = array(),
+      ['already_in_tree'] = TRUE
+    },{
+    ...
+    }
+  )
  * return the php object representing the fedora tree
  */
-function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array()){
+function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array(), $path_from_root_to_current_pid = array()){
   //Request level cache
   //$req_key = $pid.'_'.$owner_id.'_'.implode(':',$pid_list);
   //global $get_pid_tree_request;
@@ -1796,11 +2219,28 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array()){
   $to_return['pid'] = $pid;
   $repo = tuque_wrapper_get_repository_instance();
   si_exhibition_debug('repo from _si_exhibition_get_pid_tree');
+  $visibility_settings_check = si_exhibition_check_visibility($pid, $path_from_root_to_current_pid);
+  /*
+  print "\nStart\n";
+  var_dump($visibility_settings_check);
+  var_dump($pid);
+  var_dump($path_from_root_to_current_pid);
+  print "\nEnd\n";
+  */
+  
+  $debug_info = array();
+  $debug_info['pid'] = $pid;
+  $debug_info['pfrtcp'] = $path_from_root_to_current_pid;
+  $debug_info['vsc'] = $visibility_settings_check;
+  si_exhibition_debug('get_pid_tree',$debug_info);
+
+  if ($visibility_settings_check === FALSE) return NULL;
+
   if (in_array($pid, $pid_list)){
     //already did this, duplicate found:
     //dsm('found this pid in the tree already:'.$pid);
     $object = $repo->getObject($pid);
-    $to_return['object'] = $object;
+    $to_return['label'] = $object->label;
     $to_return['already_in_tree'] = TRUE;
 
     //$get_pid_tree_request[$req_key] = $to_return; //request level cache
@@ -1811,16 +2251,25 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array()){
     $exist = si_exhibition_check_object_info_accessible(array('pid' => $pid));
     if ($exist){
       $object = $repo->getObject($pid);
-      $to_return['object'] = $object;
+      $to_return['label'] = $object->label;
       $to_return['children'] = array();
       $pid_list[] = $pid;
-      //return $object->owner; //si_exhibition_get_child_concept_info($object);
-      $children = si_exhibition_get_child_concept_info($object);
+      $children = si_exhibition_get_child_concept_info_by_id($pid);
+      /*
+      print "\nchildren:";
+      var_dump($children);
+      print "\nfor pid:";
+      var_dump($pid);//BBB
+      */
+      $path_from_root_to_current_pid[] = $pid;
       //Get the children
       foreach($children as $child){
         //Build the tree from all the children
         //for each child, get their sub-tree
-        $to_return['children'][] = _si_exhibition_get_pid_tree($child['pid'],$owner_id,$pid_list);
+        $children = _si_exhibition_get_pid_tree($child['pid'],$owner_id,$pid_list, $path_from_root_to_current_pid);
+        if (!empty($children)) {
+          $to_return['children'][] = $children;
+        }
       }
       //$get_pid_tree_request[$req_key] = $to_return; //request level cache
       return $to_return;
@@ -1911,6 +2360,14 @@ function _si_exhibition_dump(&$var) {
   }
 }
 function si_exhibition_get_obj_datastream_content($pid) {
+  require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
+  $vis_obj = si_exhibition_get_visibility_object($pid);
+  if (empty($vis_obj) || empty($vis_obj['allow_download'])) {
+    si_exhibition_sidora_debug('No vis object or vis object allow_download');
+    watchdog('exhibition','Obj datastream content not allowed:'.$pid);
+    if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
+    drupal_exit();
+  }
   $repo = tuque_wrapper_get_repository_instance();
   $object = $repo->getObject($pid);
   foreach($object as $dsid_loop=>$datastream_loop) {
@@ -1921,6 +2378,7 @@ function si_exhibition_get_obj_datastream_content($pid) {
 	}	
   if (empty($datastream_content)){
     print t('Datastream not found by that name');
+    watchdog('exhibition','Obj datastream content not exist:'.$pid);
     drupal_exit();
   }
   //datastream_content is now set.  perform the output
@@ -1942,6 +2400,16 @@ function si_exhibition_get_obj_datastream_content($pid) {
       curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
       $data = curl_exec($ch);
       if ($data === FALSE){
+        /*
+        ob_start();
+        print "Error on file extension call\n";
+        var_dump($ch);
+        var_dump($curl_errori($ch));
+        var_dump(curl_getinfo($ch));
+        $debug_result = ob_get_clean();
+        si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+        */
+
         $curl_error_string = curl_error($ch);
        // print_t('Could not obtain data from:'.$url_to_get);
         print $curl_error_string.'<br/>'."\n";
@@ -1950,7 +2418,17 @@ function si_exhibition_get_obj_datastream_content($pid) {
         curl_close($ch);
         return;
       }
+      /*
+      ob_start();
+      print "Success on file extension call\n";
+      var_dump($ch);
+      var_dump(curl_error($ch));
+      var_dump(curl_getinfo($ch));
+      $debug_result = ob_get_clean();
+      si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+      */
       curl_close($ch);
+
       $extension = json_decode($data);
 			$filename = $pid.'_OBJ'.$extension;//get_suggest_filename($label, $mime_type);*/
 		}	
@@ -1959,3 +2437,135 @@ function si_exhibition_get_obj_datastream_content($pid) {
     print $datastream_content;
 		drupal_exit();
 }		
+function si_exhibition_deliver_streaming($pid, $dsid = 'OBJ') {
+  $repo = tuque_wrapper_get_repository_instance();
+  $object = $repo->getObject($pid);
+  $datastream = $object[$dsid];
+  header('Content-type: ' . $datastream->mimetype);
+  if ($datastream->controlGroup == 'M' || $datastream->controlGroup == 'X') {
+    header('Content-length: ' . $datastream->size);
+  }
+  $chunk_headers = si_exhibition_islandora_view_datastream_set_chunk_headers($datastream);
+  si_exhibition_islandora_view_datastream_deliver_chunks($datastream, $chunk_headers);
+  exit();
+}
+/**
+ * Set the headers for the chunking of our content.
+ *
+ * @param AbstractDatastream $datastream
+ *   An AbstractDatastream representing a datastream on a Fedora object.
+ *
+ * @return bool
+ *   TRUE if there are chunks to be returned, FALSE otherwise.
+ */
+function si_exhibition_islandora_view_datastream_set_chunk_headers(AbstractDatastream $datastream) {
+  $file_uri = si_exhibition_islandora_view_datastream_retrieve_file_uri($datastream);
+  // The meat of this has been taken from:
+  // http://mobiforge.com/design-development/content-delivery-mobile-devices.
+  $size   = filesize($file_uri);
+  $length = $size;
+  $start  = 0;
+  $end    = $size - 1;
+
+  header("Accept-Ranges: 0-$length");
+  if (isset($_SERVER['HTTP_RANGE'])) {
+    $c_start = $start;
+    $c_end   = $end;
+    // Extract the range string.
+    list(, $range) = explode('=', $_SERVER['HTTP_RANGE'], 2);
+    // Make sure the client hasn't sent us a multibyte range.
+    if (strpos($range, ',') !== FALSE) {
+      // Not a valid range, notify the client.
+      header('HTTP/1.1 416 Requested Range Not Satisfiable');
+      header("Content-Range: bytes $start-$end/$size");
+      exit;
+    }
+    // If the range starts with an '-' we start from the beginning. If not, we
+    // forward the file pointer and make sure to get the end byte if specified.
+    if (strpos($range, '-') === 0) {
+      // The n-number of the last bytes is requested.
+      $c_start = $size - substr($range, 1);
+    }
+    else {
+      $range  = explode('-', $range);
+      $c_start = $range[0];
+      $c_end   = (isset($range[1]) && is_numeric($range[1])) ? $range[1] : $size;
+    }
+    /* Check the range and make sure it's treated according to the specs.
+     * http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html
+     */
+    // End bytes can not be larger than $end.
+    $c_end = ($c_end > $end) ? $end : $c_end;
+    // Validate the requested range and return an error if it's not correct.
+    if ($c_start > $c_end || $c_start > $size - 1 || $c_end >= $size) {
+      header('HTTP/1.1 416 Requested Range Not Satisfiable');
+      header("Content-Range: bytes $start-$end/$size");
+      exit;
+    }
+    $start  = $c_start;
+    $end    = $c_end;
+    // Calculate new content length.
+    $length = $end - $start + 1;
+    header('HTTP/1.1 206 Partial Content');
+  }
+  // Notify the client the byte range we'll be outputting.
+  header("Content-Range: bytes $start-$end/$size");
+  header("Content-Length: $length");
+  return array(
+    'start' => $start,
+    'end' => $end,
+  );
+}
+/**
+ * Deliver back the specified chunks of a file.
+ *
+ * @param AbstractDatastream $datastream
+ *   An AbstractDatastream representing a datastream on a Fedora object.
+ * @param array $params
+ *   An associate array containing the start and ending chunk bytes.
+ */
+function si_exhibition_islandora_view_datastream_deliver_chunks(AbstractDatastream $datastream, $params) {
+  $file_uri = si_exhibition_islandora_view_datastream_retrieve_file_uri($datastream);
+  // The meat of this has been taken from:
+  // http://mobiforge.com/design-development/content-delivery-mobile-devices.
+  $fp = @fopen($file_uri, 'rb');
+  fseek($fp, $params['start']);
+  // Start buffered download.
+  $buffer = 1024 * 8;
+  while (!feof($fp) && ($p = ftell($fp)) <= $params['end']) {
+    if ($p + $buffer > $params['end']) {
+      // In case we're only outputting a chunk, make sure we don't read past the
+      // length.
+      $buffer = $params['end'] - $p + 1;
+    }
+    // Reset time limit for big files.
+    set_time_limit(0);
+    echo fread($fp, $buffer);
+  }
+  fclose($fp);
+}
+
+/**
+ * Creates/returns the file URI for the content of a datastream for chunking.
+ *
+ * @param AbstractDatastream $datastream
+ *   An AbstractDatastream representing a datastream on a Fedora object.
+ * @param $extension
+ *   Extension for the file
+ *
+ * @return string
+ *   The URI of the file.
+ */
+function si_exhibition_islandora_view_datastream_retrieve_file_uri(AbstractDatastream $datastream, $extension = '') {
+  $file_uri = 'temporary://chunk_' . $datastream->parent->id . '_' . $datastream->id . '_' . $datastream->createdDate->getTimestamp() . '.' . $extension;
+  if (!file_exists($file_uri)) {
+    $file = new stdClass();
+    $file->uri = $file_uri;
+    $file->filename = drupal_basename($file_uri);
+    $file->filemime = $datastream->mimeType;
+    $file->status = 0;
+    $datastream->getContent($file_uri);
+    file_save($file);
+  }
+  return $file_uri;
+}

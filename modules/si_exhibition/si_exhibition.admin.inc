@@ -16,6 +16,7 @@
  *   The drupal form definition.
  */
 function si_exhibition_admin_settings($form, &$form_state) {
+  module_load_include('inc', 'si_exhibition', 'includes/workbench_viewers.admin');
   $form = array(
     'si_exhibition_expose_block' => array(
       '#type' => 'select',
@@ -45,6 +46,13 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#size' => 100,
       '#description' => t('The Fedora Commons pid will be directly appended to the above, end with / if needed.'),
     ),
+    'si_exhibition_visibility_info_url' => array(
+      '#type' => 'textfield',
+      '#title' => t('Where to obtain the visibility information from the exhibition_config settings'),
+      '#default_value' => variable_get('si_exhibition_visibility_info_url', ''),
+      '#size' => 100,
+      '#description' => t('The Fedora Commons pid will be directly appended to the above, end with / if needed. WARNING: If empty, will not show any exhibition.'),
+    ),
     'si_exhibition_metadata_xsl' => array(
       '#type' => 'textarea',
       '#rows' => '25',
@@ -72,7 +80,16 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#default_value' => variable_get('fedora_base_url', 'http://localhost:8080/fedora'),
       '#description' => t('The Fedora Commons Repo location'),
     ),
+    'sidora_js_lib_location_jstree' => array(
+      '#type' => 'textfield',
+      '#title' => t('jstree'),
+      '#default_value' => variable_get('sidora_js_lib_location_jstree', ''),
+      '#description' => t('This should be an http / https location containing jstree.js and themes/default/style.min.css.  jsTree can be downloaded from https://github.com/vakata/jstree or http://jstree.com'),
+      '#attributes' => array('size' => 120),
+      '#maxlength' => 1024,
+    ),
   );
+  _sidora_admin_settings_add_viewer_configs($form);
   return system_settings_form($form);
 }
 

@@ -60,8 +60,8 @@ function si_exhibition_ds(pid, dsid, title) {
         });
       }
     );
-    return false; // Prevent Event Propagation
   })(jQuery);
+  return false; // Prevent Event Propagation
 }
 function recolorShadowboxTable(){
 /*
