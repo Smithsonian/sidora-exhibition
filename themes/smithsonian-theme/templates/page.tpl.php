@@ -35,10 +35,16 @@ if (!empty($extra_css)){
             <?php if (isset($variables['sidora_exhibition']['logo']) || $site_name || $site_slogan): ?>
             <div id="header-site-info" class="header-site-info block">
               <div id="header-site-info-inner" class="header-site-info-inner inner">
-                <?php if ($logo): ?>
+                <?php if (!empty($variables['sidora_exhibition']['logo'])) : ?>
                 <div id="logo">
                   <a href="<?php print check_url($front_page); ?>" title="<?php print t('Home'); ?>"><img src="<?php print $variables['sidora_exhibition']['logo']; ?>" alt="<?php print t('Home'); ?>" <?php print (isset($variables['sidora_exhibition']['logo_height']) ? 'height="'.$variables['sidora_exhibition']['logo_height'].'"' : ''); ?> <?php print (isset($variables['sidora_exhibition']['logo_width']) ? 'width="'.$variables['sidora_exhibition']['logo_width'].'"' : ''); ?> /></a>
                 </div>
+                <?php else: ?>
+                  <?php if (!empty($logo)) : ?>
+                <div id="logo">
+                  <a href="<?php print check_url($front_page); ?>" title="<?php print t('Home'); ?>"><img src="<?php print $logo; ?>" alt="<?php print t('Home'); ?>"></a>
+                </div>
+                  <?php endif; ?>
                 <?php endif; ?>
                 <?php if ($site_name || $site_slogan): ?>
                 <div id="site-name-wrapper" class="clearfix">
@@ -188,6 +194,7 @@ if (!empty($extra_css)){
         <div id="footer-message" class="footer-message row <?php print $grid_width; ?>">
           <div id="footer-message-inner" class="footer-message-inner inner clearfix">
             <?php print theme('grid_block', array('content' => drupal_render($page['footer_message']), 'id' => 'footer-message-text')); ?>
+            <p><a href="<?php print $GLOBALS['base_url'];?>/Terms+of+Use">Terms of Use</a>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<a href="http://www.si.edu/privacy/">Privacy Notice</a></p>
           </div><!-- /footer-message-inner -->
         </div><!-- /footer-message -->
       </div><!-- /footer-message-wrapper -->

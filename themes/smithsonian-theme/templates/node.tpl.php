@@ -1,20 +1,27 @@
 <?php
-?>
+if (empty($node_classes)) {
+  $node_classes = '';
+}
 
+if (empty($terms)) {
+  $terms = '';
+}
+
+if (empty($links)) {
+  $links = '';
+}
+?>
 <div id="node-<?php print $node->nid; ?>" class="node <?php print $node_classes; ?>">
   <div class="inner">
-    <?php print $picture ?>
-
+    <?php print empty($picture)?'':$picture ?>
     <?php if ($page == 0): ?>
     <h2 class="title"><a href="<?php print $node_url ?>" title="<?php print $title ?>"><?php print $title ?></a></h2>
     <?php endif; ?>
-
     <?php if ($submitted): ?>
     <div class="meta">
       <span class="submitted"><?php print $submitted ?></span>
     </div>
     <?php endif; ?>
-
     <?php if ($node_top && !$teaser): ?>
     <div id="node-top" class="node-top row nested">
       <div id="node-top-inner" class="node-top-inner inner">
@@ -22,24 +29,25 @@
       </div><!-- /node-top-inner -->
     </div><!-- /node-top -->
     <?php endif; ?>
-
     <div class="content clearfix">
-      <?php print $content ?>
+      <?php if (is_array($content)) {
+          print render($content);
+        }
+        else {
+          print $content ;
+        }?>
     </div>
-
     <?php if ($terms): ?>
     <div class="terms">
       <?php print $terms; ?>
     </div>
     <?php endif;?>
-
     <?php if ($links): ?>
     <div class="links">
       <?php print $links; ?>
     </div>
     <?php endif; ?>
   </div><!-- /inner -->
-
   <?php if ($node_bottom && !$teaser): ?>
   <div id="node-bottom" class="node-bottom row nested">
     <div id="node-bottom-inner" class="node-bottom-inner inner">
