@@ -118,7 +118,8 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       'dsid' => array('OBJ','CSV'),
       'view' => array('OBJ','CSV'),
       'url' => 'sidora_viewer',
-      'func' => 'si_exhibition_ds',
+      'tn' => TRUE,
+			'func' => 'si_exhibition_ds',
       'type' => array('r-csv', 'csv'), // Icon, Label
       'class' => 'resources-csv'
     ),
@@ -158,7 +159,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   */
  
   $display = array_pop(array_intersect_key($display_definitions, array_flip($resource['models']))); // Assuming an object can't be two types of resources.
-  $display['url'] = (isset($display['url'])?$display['url']:'');
+	$display['url'] = (isset($display['url'])?$display['url']:'');
   $label = $resource['label'];
   // Metadata
   //$display_metadata_function = 'return si_exhibition_ds("' . $resource['pid'] . '", "METADATA")';
@@ -168,7 +169,6 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   //Serach through the types we care about to find a datastream that's available
   //Originally set up as a single DSID, shoehorning in having datastream options
   $view = '';
-
   if ($resource['visibility']['show_preview']){ //Do not show the "preview" thumbnail & link if preview is off
     $available_view = '';
     if (is_array($display['view'])) foreach($display['view'] as $curr_view) if (array_search($curr_view, $resource['datastreams']) !== FALSE) $available_view = $curr_view;
@@ -176,7 +176,10 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     $preview = '';
     if (array_search($display['view'], $resource['datastreams']) !== FALSE) {
       $thumbnail_url = url("fedora/repository/{$resource['pid']}/TN");
-      $view_preview = (isset($display['tn']) && array_search('TN', $resource['datastreams']) !== FALSE) ? "<img class='resource-tn' src='$thumbnail_url'/>" : '';
+      if (array_search('si:datasetCModel', $resource['models']) !== FALSE) {
+			  $thumbnail_url = $GLOBALS['base_url'].'/'.drupal_get_path('module','si_exhibition').'/images/icons/x-office-spreadsheet.png';
+			}	
+			$view_preview = (isset($display['tn']) && (array_search('TN', $resource['datastreams']) !== FALSE || array_search('si:datasetCModel', $resource['models']) !== FALSE)) ? "<img class='resource-tn' src='$thumbnail_url'/>" : '';
       if (isset($display['url'])) {
         $prefix = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" rel="shadowbox" title="' . $resource['label'] . '">';
         $postfix = '</a>';

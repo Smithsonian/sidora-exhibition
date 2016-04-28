@@ -156,7 +156,7 @@ function si_exhibition_get_parent_info_by_id($pid, $skipNonTreeParents = false) 
   $query = si_exhibition_generate_parent_concept_query($pid);
   $results = $repo->ri->itqlQuery($query);
   $parents = array_map(function($o) {
-    return array('pid' => $o['o']['value'], 'label' => $o['t']['value']); 
+    return array('pid' => $o['object']['value'], 'label' => $o['title']['value']); 
   }, $results);
   
   // @todo replace the checks for each objects existance once we have the appropriate information in the rels to determine if its accessible.
@@ -189,13 +189,12 @@ function si_exhibition_get_parent_info_by_id($pid, $skipNonTreeParents = false) 
  *   An itql query string.
  */
 function si_exhibition_generate_parent_concept_query($pid) {
-  return 'select $o $t from <#ri> where
-    $o <fedora-model:state> <fedora-model:Active> and
-    $o <fedora-model:label> $t and
-    $o <fedora-rels-ext:hasConcept> <info:fedora/' . $pid . '>
-    order by $t';
+  return "select ?object ?title from <#ri> where {
+    ?object <fedora-model:state> <fedora-model:Active>;
+            <fedora-model:label> ?title;
+            <fedora-rels-ext:hasConcept> <info:fedora/" . $pid . ">
+    } order by ?title";
 }
-
 
 /**
  * Fetchs some information about the given object's child concepts.
@@ -458,7 +457,6 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
   );
   $resources = array();
   $resource_types = isset($resource_types[$type]) ? $resource_types[$type] : FALSE;
-
   $parent_path = si_exhibition_get_pid_path_to_showing_concept();
   array_pop($parent_path); //Remove the current concept from the "parents" list
   $vis_obj = si_exhibition_get_visibility_object($object_id, $parent_path); //Get the visibility of the current concept
@@ -574,30 +572,34 @@ function si_exhibition_fill_out_resources(&$resources, $show, $limit = NULL, $of
  * @return string
  *   An itql query string
  */
+
 function si_exhibition_generate_child_resource_query($pid, array $resource_types, $sort = 'asc', $limit = NULL, $offset = NULL) {
   $limit_types = '';
   if (!empty($resource_types)) {
     $limit_type_expression = function($o) {
-      return "\$m <mulgara:is> <info:fedora/$o>";
+      return "sameTerm(?model, <info:fedora/$o>)";
     };
     $limit_types = array_map($limit_type_expression, $resource_types);
-    $limit_types = implode(' or ', $limit_types);
-    $limit_types = "({$limit_types}) and";
+    $limit_types = implode(' || ', $limit_types);
+    $limit_types = "({$limit_types}) && ";
   }
-  $limit = isset($limit) ? "limit $limit" : '';
-  $offset = isset($offset) ? "offset $offset" : '';
-  $to_return = 'select $o $t $m from <#ri> where
-    $o <fedora-model:state> <fedora-model:Active> and
-    $o <fedora-model:label> $t and
-    <info:fedora/' . $pid . '> <fedora-rels-ext:hasResource> $o and
-    ' . $limit_types . '
-    $o <fedora-model:hasModel> $m
-    minus $m <mulgara:is> <info:fedora/si:resourceCModel>
-    minus $m <mulgara:is> <info:fedora/fedora-system:FedoraObject-3.0>
-    order by $t ' . $sort . '
-    ' . $limit . '
-    ' . $offset;
-  si_exhibition_debug('<pre>'.htmlspecialchars($to_return).'</pre>');
+  $limit = isset($limit) ? " $limit" : '1000000';
+  $offset = isset($offset) ? " $offset" : '0';
+  $sort = strtoupper($sort);
+  $to_return = "select ?object ?title ?model from <#ri> where {
+    ?object <fedora-model:state> <fedora-model:Active>;
+            <fedora-model:label> ?title;
+            <fedora-model:hasModel> ?model.
+    <info:fedora/{$pid}> <fedora-rels-ext:hasResource> ?object;
+    FILTER(
+		" . $limit_types . "
+       !sameTerm(?model, <info:fedora/si:resourceCModel>) &&
+			 !sameTerm(?model, <info:fedora/fedora-system:FedoraObject-3.0>))
+		}	 
+    ORDER BY {$sort}(?title)
+		LIMIT {$limit}
+		OFFSET {$offset}";
+	si_exhibition_debug('<pre>'.htmlspecialchars($to_return).'</pre>');
   return $to_return;
 }
 /*
