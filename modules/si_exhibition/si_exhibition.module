@@ -440,9 +440,24 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     //OBJ is special since that is to download the item, don't allow the OBJ datastream for
     //the generic previews
     if ($dsid == 'OBJ') {
-      si_exhibition_debug('Not allowed to use viewer directly on OBJ datastream:'.$pid);
+      //Give specific access to some viewers.  Check the viewer for the object
+      $viewer_config = si_exhibition_forward_direct_open_access(array('viewer_config', $object->id), FALSE, FALSE);
+      if (empty($viewer_config)) {
+        watchdog('exhibition','No viewer config for:'.$pid);
+        drupal_exit();
+      }
+      $viewer = $viewer_config->viewer_id;
+      $obj_can_be_used_with = array_map('trim', explode(',',  variable_get('si_exhibition_obj_allowed_for_viewers', ''))); 
+      //Case-insensitive check
+      $viewer_allowed_for_obj = in_array( strtolower($viewer), array_map('strtolower', $obj_can_be_used_with) );
+      if ($viewer_allowed_for_obj) {
+      }
+      else {
+        si_exhibition_debug('Not allowed to use viewer directly on OBJ datastream for this object:'.$pid);
         if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
-      return MENU_NOT_FOUND;
+        print 'OKAY';
+        return MENU_NOT_FOUND;
+      }
     }
 
     require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
@@ -548,6 +563,29 @@ function sidora_obj($pid){
   }
   return $object;
 }
+/**
+ * Get a list of the viewer names that the exhibition knows how to deal with
+ * @returns
+ *   array of string names of viewers
+ */
+function si_exhibition_sidora_viewers_available() {
+  return array(
+    'pdfjs',
+    'IDS',
+    'OpenSeaDragon',
+    'PHPExcel',
+    'JW Audio Player',
+    'JW Video Player',
+  );
+}
+/**
+ * Controller for directing which viewer should be used for the input object
+ *
+ * @param $object 
+ *  a fedora object (only uses $object->id though)
+ * @returns
+ *  nothing, hard exit or drupal_exit based on what happened
+ */
 function si_exhibition_sidora_viewer($object){
   global $base_url;
   $pid = $object->id;
@@ -558,31 +596,37 @@ function si_exhibition_sidora_viewer($object){
   }
   module_load_include('inc', 'si_exhibition', 'includes/workbench_viewers');
   $viewer = $viewer_config->viewer_id;
-    switch ($viewer) {
-      case 'pdfjs':
-        drupal_goto(variable_get('sidora_pdf_js_location','').'?file='.$base_url.'/fedora/repository/'.$pid.'/OBJ');
-        drupal_exit();
-        break;
-      case 'IDS':
-        sidora_view_ids_iframe($pid, $dsid);
-        break;
-      case 'OpenSeaDragon':
-        sidora_view_openseadragon($pid, 'OBJ', '0');
-        break;
-      case 'PHPExcel':
-        sidora_tabular_view_phpexcelreader($pid,'OBJ');
-        break;
-      case 'JW Audio Player':
-        si_exhibition_jw_player($pid, 'PROXY_MP3/file_name_spoof.mp3');
-        break;
-      case 'JW Video Player':
-        si_exhibition_jw_player($pid, 'MP4/file_name_spoof.mp4');
-        break;
-      default:
-        echo $viewer;
-        break;
-    }
-  
+  if (!in_array($viewer, si_exhibition_sidora_viewers_available())) {
+    watchdog(
+      'exhibition',
+      'Viewer in the config sent by open_access is not configurable or not known. pid: %pid viewer_id: %view_id',
+      array('%pid' => $pid, '%view_id' => $viewer)
+    );
+  }
+  switch ($viewer) {
+    case 'pdfjs':
+      drupal_goto(variable_get('sidora_pdf_js_location','').'?file='.$base_url.'/fedora/repository/'.$pid.'/OBJ');
+      drupal_exit();
+      break;
+    case 'IDS':
+      sidora_view_ids_iframe($pid, $dsid);
+      break;
+    case 'OpenSeaDragon':
+      sidora_view_openseadragon($pid, 'OBJ', '0');
+      break;
+    case 'PHPExcel':
+      sidora_tabular_view_phpexcelreader($pid,'OBJ');
+      break;
+    case 'JW Audio Player':
+      si_exhibition_jw_player($pid, 'PROXY_MP3/file_name_spoof.mp3');
+      break;
+    case 'JW Video Player':
+      si_exhibition_jw_player($pid, 'MP4/file_name_spoof.mp4');
+      break;
+    default:
+      echo $viewer;
+      break;
+  }
   exit();
 }
 function si_exhibition_jw_player($pid, $file_path){
