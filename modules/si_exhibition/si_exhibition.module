@@ -455,7 +455,6 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
       else {
         si_exhibition_debug('Not allowed to use viewer directly on OBJ datastream for this object:'.$pid);
         if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
-        print 'OKAY';
         return MENU_NOT_FOUND;
       }
     }
