@@ -80,6 +80,12 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#default_value' => variable_get('fedora_base_url', 'http://localhost:8080/fedora'),
       '#description' => t('The Fedora Commons Repo location'),
     ),
+    'islandora_base_url' => array(
+      '#type' => 'textfield',
+      '#title' => t('Where to obtain the Fedora Commons objects when Islandora code attempts to get them'),
+      '#default_value' => variable_get('islandora_base_url', 'http://localhost:8080/fedora'),
+      '#description' => t('The Fedora Commons Repo location'),
+    ),
     'sidora_js_lib_location_jstree' => array(
       '#type' => 'textfield',
       '#title' => t('jstree'),
