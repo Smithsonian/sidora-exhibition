@@ -530,7 +530,10 @@ function sidora_obj($pid){
           watchdog('exhibition', 'Could not reach Fedora repository');
           drupal_set_message(t('The Fedora repository server is currently unavailable. Please contact the site administrator.'), 'error', FALSE);
         }
-        watchdog('exhibition', '404 error getting pid:'.$pid.'.');
+        ob_start();
+        var_dump($description);
+        $desc_as_string = ob_get_clean();
+        watchdog('exhibition', '404 error getting pid:'.$pid.'. Trying to get Fedora description, it described itself:'. $desc_as_string);
         //dsm('Could not reach Fedora');
         //drupal_not_found();
         if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
@@ -670,7 +673,8 @@ function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $
   }
   $ch = curl_init();
   $timeout = 60;
-  curl_setopt($ch, CURLOPT_URL, $url_to_get);
+  curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+  //curl_setopt($ch, CURLOPT_URL, $url_to_get);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
   curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
   curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
@@ -780,7 +784,8 @@ function si_exhibition_meta_string_for_xslt_by_id($pid){
       urlencode($pid);
     $ch = curl_init();
     $timeout = 60;
-    curl_setopt($ch, CURLOPT_URL, $url_to_get);
+    curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+    //curl_setopt($ch, CURLOPT_URL, $url_to_get);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
@@ -878,7 +883,8 @@ function si_exhibition_xsl_string($pid){
       urlencode($pid);
     $ch = curl_init();
     $timeout = 60;
-    curl_setopt($ch, CURLOPT_URL, $url_to_get);
+    curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+    //curl_setopt($ch, CURLOPT_URL, $url_to_get);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
     curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
@@ -2001,6 +2007,7 @@ function si_exhibition_sidora_debug($debug_string, $cgi = NULL) {
  * Will return NULL on errors and may set drupal error messages during the error processing
  */
 function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_messages = TRUE){
+  si_exhibition_debug("Looking for item_display_config.");
   
   $path = filter_input(INPUT_GET, 'path');
   $pid_on_url = arg(2); 
@@ -2009,7 +2016,10 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
   $cache_name = 'item_display_config';
   $cache_index = $pid.'_'.$nav_to_pid;
   $to_return = si_exhibition_cache($cache_name,$cache_index);
-  if (!empty($to_return)){ return $to_return; }
+  if (!empty($to_return)){
+    si_exhibition_debug("Found item_display_config in cache.");
+    return $to_return; 
+  }
   si_exhibition_cron_cache(__FUNCTION__, func_get_args());
   //End cache
 
@@ -2017,6 +2027,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
   //This is called a bunch of times, cache the info for the request at least
   if (!empty($_REQUEST['store_pid_config_'.$pid])){
     $to_return = $_REQUEST['store_pid_config_'.$pid];
+    si_exhibition_debug("Found item_display_config in request info");
     return si_exhibition_cache($cache_name, $cache_index, $to_return);
   }
   $to_print = '';
@@ -2028,7 +2039,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
     urlencode($pid);
   $ch = curl_init();
   $timeout = 60;
-  curl_setopt($ch, CURLOPT_URL, $url_to_get);
+  curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
   curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
   curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
@@ -2050,15 +2061,13 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
     $to_return = $se;
     return si_exhibition_cache($cache_name, $cache_index, $to_return);
   }
-    /*
     ob_start();
     print "Successful call to Exhibition_config\n";
     var_dump($ch);
     var_dump($curl_error_string);
     var_dump(curl_getinfo($ch));
     $debug_result = ob_get_clean();
-    si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
-    */
+    si_exhibition_debug($debug_result, curl_getinfo($ch));
 
 
   curl_close($ch);
@@ -2178,7 +2187,8 @@ function si_exhibition_get_visibility_tree($pid = NULL) {
   }
   $ch = curl_init();
   $timeout = 60;
-  curl_setopt($ch, CURLOPT_URL, $url_to_get);
+  curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+  //curl_setopt($ch, CURLOPT_URL, $url_to_get);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
   curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
   curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
@@ -2435,7 +2445,8 @@ function si_exhibition_get_obj_datastream_content($pid) {
       $url_to_get = variable_get('si_exhibition_workbench_xsl', '') . 'file_extension/' . urlencode($pid);
       $ch = curl_init();
       $timeout = 60;
-      curl_setopt($ch, CURLOPT_URL, $url_to_get);
+      curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+      //curl_setopt($ch, CURLOPT_URL, $url_to_get);
       curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
       curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
       curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
