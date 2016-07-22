@@ -396,6 +396,17 @@ function si_exhibition_preprocess_page(&$variables) {
  * Menu callback that replaces the default callback for fedora/repository.
  */
 function si_exhibition($pid = NULL, $dsid = NULL) {
+  if ($dsid == NULL) {
+    if (empty($_GET['time'])){
+      $actual_link = "http://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
+      if (count($_GET) == 1) { //the normal drupal q= param
+        $actual_link .= '?';
+      }
+      $actual_link .= '&time=' . time();
+      header('Location: ' . $actual_link );
+      exit();
+    }
+  }
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $pid = isset($pid) ? $pid : variable_get('fedora_repository_pid', 'si:root');
   $object = sidora_obj($pid);

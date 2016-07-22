@@ -102,6 +102,15 @@ function resourceChange(item){
 
 (function($){
   $(document).ready(function() {
+  var newLocation = window.location;
+  if (window.location.search.indexOf("?") == -1) {
+    newLocation += "?";
+  }
+  if (window.location.search.indexOf("&time=") == -1) {
+    newLocation += "&time=" + (new Date).getTime();
+    window.location = newLocation;
+    return;
+  }
  $('#forjstree').bind('loaded.jstree', function(e,data){setTimeout(function(){
    jstreeIdSelected =  $('a[href=\"'+window.location.pathname + window.location.search+'\"]').parent().attr('id');
    toOpen = [];
