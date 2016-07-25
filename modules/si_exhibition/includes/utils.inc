@@ -100,7 +100,7 @@ function sidora_update_relationship_choose_exit($uri, $predicate, $recipient, $r
         drupal_access_denied();
         break;
       default:
-        drupal_set_message(t('An error occured when attempting to access the fedora repository. Please contact the site administrator.'), 'error', FALSE);
+        //drupal_set_message(t('An error occured when attempting to access the fedora repository. Please contact the site administrator.'), 'error', FALSE);
         $message = '%type: !message in %function (line %line of %file).';
         $backtrace = $e->getTrace();
         $caller = $backtrace[1];
@@ -111,7 +111,7 @@ function sidora_update_relationship_choose_exit($uri, $predicate, $recipient, $r
           '%file' => $caller['file'],
           '%line' => $caller['line']
         );
-        watchdog('islandora', $message, $variables, WATCHDOG_ERROR, NULL);
+        watchdog('si_exhibition_util', $message, $variables, WATCHDOG_ERROR, NULL);
         drupal_not_found();
         break;
      }
