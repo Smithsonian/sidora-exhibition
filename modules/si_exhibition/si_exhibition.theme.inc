@@ -179,7 +179,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       if (array_search('si:datasetCModel', $resource['models']) !== FALSE) {
 			  $thumbnail_url = $GLOBALS['base_url'].'/'.drupal_get_path('module','si_exhibition').'/images/icons/x-office-spreadsheet.png';
 			}	
-			$view_preview = (isset($display['tn']) && (array_search('TN', $resource['datastreams']) !== FALSE || array_search('si:datasetCModel', $resource['models']) !== FALSE)) ? "<img class='resource-tn' src='$thumbnail_url'/>" : '';
+			$view_preview = (isset($display['tn']) && (array_search('TN', $resource['datastreams']) !== FALSE || array_search('si:datasetCModel', $resource['models']) !== FALSE)) ? "<img alt='image thumbnail for {$resource['label']}' class='resource-tn' src='$thumbnail_url'/>" : '';
       if (isset($display['url'])) {
         $prefix = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" rel="shadowbox" title="' . $resource['label'] . '">';
         $postfix = '</a>';

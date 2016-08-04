@@ -37,7 +37,7 @@ if (!empty($extra_css)){
               <div id="header-site-info-inner" class="header-site-info-inner inner">
                 <?php if (!empty($variables['sidora_exhibition']['logo'])) : ?>
                 <div id="logo">
-                  <a href="<?php print check_url($front_page); ?>" title="<?php print t('Home'); ?>"><img src="<?php print $variables['sidora_exhibition']['logo']; ?>" alt="<?php print t('Home'); ?>" <?php print (isset($variables['sidora_exhibition']['logo_height']) ? 'height="'.$variables['sidora_exhibition']['logo_height'].'"' : ''); ?> <?php print (isset($variables['sidora_exhibition']['logo_width']) ? 'width="'.$variables['sidora_exhibition']['logo_width'].'"' : ''); ?> /></a>
+                  <img src="<?php print $variables['sidora_exhibition']['logo']; ?>" alt="<?php print t('Exhibition Logo'); ?>" <?php print (isset($variables['sidora_exhibition']['logo_height']) ? 'height="'.$variables['sidora_exhibition']['logo_height'].'"' : ''); ?> <?php print (isset($variables['sidora_exhibition']['logo_width']) ? 'width="'.$variables['sidora_exhibition']['logo_width'].'"' : ''); ?> />
                 </div>
                 <?php else: ?>
                   <?php if (!empty($logo)) : ?>
