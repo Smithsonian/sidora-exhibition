@@ -584,7 +584,6 @@ function sidora_obj($pid){
 function si_exhibition_sidora_viewers_available() {
   return array(
     'pdfjs',
-    'IDS',
     'OpenSeaDragon',
     'PHPExcel',
     'JW Audio Player',
@@ -616,13 +615,15 @@ function si_exhibition_sidora_viewer($object){
       array('%pid' => $pid, '%view_id' => $viewer)
     );
   }
+  ob_start();
+  print "Ready to display using the sidora_viewer:".$viewer;
+  $debug_result = ob_get_clean();
+  si_exhibition_debug($debug_result);
+
   switch ($viewer) {
     case 'pdfjs':
       drupal_goto(variable_get('sidora_pdf_js_location','').'?file='.$base_url.'/fedora/repository/'.$pid.'/OBJ');
       drupal_exit();
-      break;
-    case 'IDS':
-      sidora_view_ids_iframe($pid, $dsid);
       break;
     case 'OpenSeaDragon':
       sidora_view_openseadragon($pid, 'OBJ', '0');
@@ -740,10 +741,6 @@ function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $
 function si_exhibition_check_view_permission($object_pid) {
   $xacml_dsid = 'POLICY';
 
-  module_load_include('inc', 'fedora_repository', 'api/fedora_utils');
-  module_load_include('inc', 'fedora_repository', 'api/fedora_item');
-  module_load_include('inc', 'islandora_xacml_api', 'Xacml');
-  module_load_include('inc', 'fedora_repository', 'ObjectHelper');
 
   // when we call in from top level collections in JS get get the
   // pid being undefined

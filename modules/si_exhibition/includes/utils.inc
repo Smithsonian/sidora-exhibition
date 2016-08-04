@@ -164,42 +164,6 @@ function sidora_get_children($pid) {
   return $results;
 }
 
-
-function sidora_get_cmodels_cmodel($pid) {
-  $query = 'select $object $title $model $parent_model
-    from <#ri>
-    where ($object <info:fedora/fedora-system:def/model#label> $title
-    and $object <mulgara:is> <info:fedora/' . $pid . '>
-    and $object <fedora-model:hasModel> $model
-    and $model <fedora-model:hasModel> $parent_model
-    and $object <fedora-model:state> <info:fedora/fedora-system:def/model#Active>)
-    minus $model <mulgara:is> <info:fedora/fedora-system:FedoraObject-3.0>
-    minus $model <mulgara:is> <info:fedora/fedora-system:ContentModel-3.0>
-    minus $parent_model <mulgara:is> <info:fedora/fedora-system:FedoraObject-3.0>
-    order by $title';
-  module_load_include('inc', 'fedora_repository', 'CollectionClass');
-  $collection = new CollectionClass();
-  $results = $collection->getRelatedObjects(NULL, 1000000, NULL, $query);
-  $ret = array();
-  if ($results != '') {
-    $document = new DOMDocument();
-    $document->loadXML($results);
-    $path = new DOMXPath($document);
-    $path->registerNamespace('sparql', 'http://www.w3.org/2001/sw/DataAccess/rf1/result');
-    $results = $path->query('//sparql:result');
-    $count = $results->length;
-    if ($count > 0) {
-      for ($i = 0; $i < $count; $i++) {
-        $result = $results->item($i);
-        $parent_model_pid = substr($path->query('sparql:parent_model/@uri', $result)->item(0)->value, 12); // 12 characteres in "info:fedora/"
-        $ret[] = $parent_model_pid;
-      }
-    }
-    return $ret;
-  }
-  return $ret;
-}
-
 /**
  * gets a list of concept object pids with their titles by comparing the substring to the objects label
  * used for generating type aheads.
@@ -220,106 +184,7 @@ function sidora_get_concepts(&$concepts, $substring = NULL) {
   return $results;
 }
 
-/**
- * runs and itql query and returns the results in an array, array is formatted for form api select element
- * @param string $query
- * @return array
- */
-function sidora_query($query) {
-  module_load_include('inc', 'fedora_repository', 'CollectionClass');
-  $collection = new CollectionClass();
-  $results = $collection->getRelatedObjects(NULL, 1000000, NULL, $query);
-  $results = trim($results);
-  $ret = array();
-  if ($results != '') {
-    $document = new DOMDocument();
-    $document->loadXML($results);
-    $path = new DOMXPath($document);
-    $path->registerNamespace('sparql', 'http://www.w3.org/2001/sw/DataAccess/rf1/result');
-    $results = $path->query('//sparql:result');
-    $count = $results->length;
-    if ($count > 0) {
-      for ($i = 0; $i < $count; $i++) {
-        $result = $results->item($i);
-        $pid = substr($path->query('sparql:object/@uri', $result)->item(0)->value, 12); // 12 characteres in "info:fedora/"
-        $label = $path->query('sparql:title', $result)->item(0)->textContent;
-        if (strlen($label) > 125) {
-          $label = substr($label, 0, 125); //this text will be shown in a form select so keep it short
-        }
-        if (!empty($label)) {
-          $ret[$pid] = $label;
-        }
-      }
-    }
-    return $ret;
-  }
-  return $ret;
-}
 
-/**
- * Creates a list of recently ingested objects that have a RELS-EXT statement that says this objects metadata has not yet been modified.
- * This list appears on the users account page so they can find objects they have ingested but not yet updated.
- *
- * @global object $user
- *  the drupal user
- *
- * @global <type> $base_url
- *
- * @return string
- *  a themed pager
- */
-function sidora_get_unmodified_objects() {
-  global $user;
-  global $base_url;
-  $name = $user->name;
-  $query = 'select $object $title $model $created $orginalMeta $ownerID from <#ri>
-where ($object <info:fedora/fedora-system:def/model#label> $title
-and $object <fedora-model:hasModel> $model
-and $object <fedora-model:createdDate> $created
-and $object <fedora-model:state> <info:fedora/fedora-system:def/model#Active>
-and $object <info:fedora/fedora-system:def/model#ownerId> $ownerID
-and $ownerID <mulgara:is> \'' . $name . '\'
-and $object <http://islandora.org/ontologies/metadata#orginal_metadata> $orginalMeta
-and $orginalMeta <mulgara:is> \'TRUE\'
-)
-minus $model <mulgara:is> <info:fedora/fedora-system:FedoraObject-3.0>
-minus $model <mulgara:is> <info:fedora/fedora-system:ContentModel-3.0>
-order by $title';
-  module_load_include('inc', 'fedora_repository', 'CollectionClass');
-  $collection = new CollectionClass();
-  $results = $collection->getRelatedObjects(NULL, 1000000, NULL, $query);
-  $results = trim($results);
-  $arr = array();
-  if ($results != '') {
-    $document = new DOMDocument();
-    $document->loadXML($results);
-    $path = new DOMXPath($document);
-    $path->registerNamespace('sparql', 'http://www.w3.org/2001/sw/DataAccess/rf1/result');
-    $results = $path->query('//sparql:result');
-    $count = $results->length;
-    $number_per_page = variable_get('sidora_number_per_page', 10);
-    $page_number = 0;
-    if (isset($_GET['page'])) {
-      $page_number = $_GET['page'];
-    }
-    if ($count > 0) {
-      $ii = $page_number * $number_per_page;
-      for ($i = $ii; $i < $count; $i++) {
-        $result = $results->item($i);
-        $pid = substr($path->query('sparql:object/@uri', $result)->item(0)->value, 12); // 12 characteres in "info:fedora/"
-        $label = $path->query('sparql:title', $result)->item(0)->textContent;
-        $created = $path->query('sparql:created', $result)->item(0)->textContent;
-        $relatedCount = $path->query('sparql:k0', $result)->item(0)->textContent;
-        $arr[] = l($label, $base_url . '/fedora/repository/' . $pid);
-        if ($i >= $ii - 1 + $number_per_page)
-          break;
-      }
-    }
-  }
-  _sidora_pager_init($count, $number_per_page, $element = 0);
-  $pager = theme('pager', NULL, $number_per_page, 0, NULL, 10);
-  return $pager . '<br />' . theme('item_list', $arr, 'Image objects with Original Metadata') . '<br />' . $pager;
-}
 
 /**
  * Initialize a pager for theme('pager') without running an SQL query.
@@ -805,61 +670,6 @@ function sidora_set_relationship(FedoraRelationships $relationships, $predicate_
 }
 
 /**
- * Creates a user object for the given user account.
- *
- * All user objects are added as children to 'si:user-projects'.
- *
- * @param stdClass $account
- *   The Drupal user account object.
- *
- * @return AbstractObject
- *   The created user object if successful, FALSE otherwise.
- */
-function sidora_create_user_object(stdClass $account) {
-  $user_projects = islandora_object_load('si:user-projects');
-  if (!is_object($user_projects)) {
-    return FALSE;
-  }
-  module_load_include('inc', 'xml_form_builder', 'includes/associations');
-  $user_object = $user_projects->repository->constructObject('si-user');
-  $user_object->owner = $account->name;
-  $user_object->label = "{$account->name} Projects";
-  $user_object->models = array('si:conceptCModel', variable_get('sidora_automatic_person_model', 'si:HierarchyObject'));
-  /*
-  $eaccpf = sidora_create_default_person_eaccpf($user_object, $account);
-  sidora_update_datastream($user_object, $eaccpf, 'EAC-CPF');
-  */
-  $descmeta = sidora_create_default_person_descmeta($user_object, $account);
-  sidora_update_datastream($user_object, $descmeta, 'DESCMETA');
-  $collection_policy = drupal_get_path('module', 'sidora') . '/data/policies/default_COLLECTION_POLICY.xml';
-  sidora_update_datastream($user_object, $collection_policy, 'COLLECTION_POLICY');
-  sidora_update_datastream($user_object, sidora_create_default_xacml($account), 'POLICY');
-  $associations = xml_form_builder_get_associations(array(), $user_object->models, array());
-  if (count($associations) == 1){
-    sidora_update_datastream($user_object, '<sidora>
-<model>'.$associations[0]['content_model'].'</model>
-<form>'.$associations[0]['form_name'].'</form>
-<ontology_location_id>AUTOMATIC_USER_CREATION_FROM_ASSOCIATION</ontology_location_id>
-<meta_requirements_fulfilled>FALSE</meta_requirements_fulfilled>
-<initial_dsid>'.$associations[0]['dsid'].'</initial_dsid>
-</sidora>', 'SIDORA');
-  }else{
-    $dsid = variable_get('sidora_automatic_person_dsid', 'DESCMETA');
-    sidora_update_datastream($user_object, '<sidora>
-<model>'.variable_get('sidora_automatic_person_model', 'si:HierarchyObject').'</model>
-<form>'. variable_get('sidora_automatic_person_form', 'Person 2015').'</form>
-<ontology_location_id>AUTOMATIC_USER_CREATION_FROM_SIDORA_DEFAULT</ontology_location_id>
-<meta_requirements_fulfilled>FALSE</meta_requirements_fulfilled>
-<initial_dsid>'.$dsid.'</initial_dsid>
-</sidora>', 'SIDORA');
-    if (empty($user_object[$dsid])) sidora_update_datastream($user_object, '<xml></xml>', $dsid);
-  }
-
-  sidora_add_child($user_projects, $user_object);
-  return islandora_add_object($user_object);
-}
-
-/**
  * Creates the default XACML POLICY for the given user.
  *
  * If no users is given the currently logged in user is used.
@@ -874,7 +684,6 @@ function sidora_create_user_object(stdClass $account) {
  *   The generated XACML POLICY.
  */
 function sidora_create_default_xacml(stdClass $account = NULL) {
-  module_load_include('inc', 'islandora_xacml_api', 'Xacml');
   global $user;
   $account = is_object($account) ? $account : $user;
   $xacml = new Xacml();
