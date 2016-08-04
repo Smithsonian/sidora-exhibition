@@ -75,7 +75,8 @@ function sidora_tabular_view_phpexcelreader($pid,$dsid = 'OBJ'){
   <script>
     jQuery(document).ready(function(){
       jQuery("table").DataTable({
-        "lengthMenu": [ [-1,5,10,25,100],["All",5,10,25,100] ]
+        "lengthMenu": [ [-1,5,10,25,100],["All",5,10,25,100] ],
+        "order": []
       });
       jQuery("table").show();
       jQuery("#noHeader_wrapper").show();
