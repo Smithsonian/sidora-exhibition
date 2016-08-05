@@ -154,7 +154,8 @@ function si_exhibition_get_parent_info_by_id($pid, $skipNonTreeParents = false) 
   $repo = tuque_wrapper_get_repository_instance();
   si_exhibition_debug('repo from si_exhibition_get_parent_info_by_id');
   $query = si_exhibition_generate_parent_concept_query($pid);
-  $results = $repo->ri->itqlQuery($query);
+  //$results = $repo->ri->itqlQuery($query);
+  $results = $repo->ri->sparqlQuery($query);
   $parents = array_map(function($o) {
     return array('pid' => $o['object']['value'], 'label' => $o['title']['value']); 
   }, $results);
@@ -189,11 +190,17 @@ function si_exhibition_get_parent_info_by_id($pid, $skipNonTreeParents = false) 
  *   An itql query string.
  */
 function si_exhibition_generate_parent_concept_query($pid) {
-  return "select ?object ?title from <#ri> where {
+  /*return "select ?object ?title from <#ri> where {
     ?object <fedora-model:state> <fedora-model:Active>;
             <fedora-model:label> ?title;
             <fedora-rels-ext:hasConcept> <info:fedora/" . $pid . ">
-    } order by ?title";
+    } order by ?title";*/
+	return "select ?object ?title from <#ri>
+       where {
+         ?object <info:fedora/fedora-system:def/model#state> <info:fedora/fedora-system:def/model#Active> .
+         ?object <info:fedora/fedora-system:def/model#label> ?title .
+         ?object <info:fedora/fedora-system:def/relations-external#hasConcept> <info:fedora/" . $pid . ">
+     } ORDER BY ?title";
 }
 
 /**
@@ -218,7 +225,7 @@ function si_exhibition_get_child_concept_info_by_id($object_id) {
   $repo = tuque_wrapper_get_repository_instance();
   si_exhibition_debug('repo from si_exhibition_get_child_concept_info');
   $query = si_exhibition_generate_child_concept_query($object_id);
-  $results = $repo->ri->itqlQuery($query);
+  $results = $repo->ri->sparqlQuery($query);
   $children = array_map(function($o) { return array('pid' => $o['o']['value'], 'label' => $o['t']['value'], 'count' => $o['k0']['value']); }, $results);
   // @todo replace the checks for each objects existance once we have the appropriate information in the rels to determine if its accessible.
   if (variable_get('si_exhibition_anonymous_only', FALSE)){
@@ -242,14 +249,26 @@ function si_exhibition_get_child_concept_info_by_id($object_id) {
  *   An itql query string.
  */
 function si_exhibition_generate_child_concept_query($pid) {
-  $count = 'count(select $c from <#ri> where
+  /*$count = 'count(select $c from <#ri> where
     $o <fedora-rels-ext:hasConcept> $c and
     $c <fedora-model:state> <fedora-model:Active>)';
   return 'select $o $t ' . $count . ' from <#ri> where
      $o <fedora-model:state> <fedora-model:Active> and
      $o <fedora-model:label> $t and
      <info:fedora/' . $pid . '> <fedora-rels-ext:hasConcept> $o
-     order by $t';
+     order by $t';*/
+		 return "SELECT ?o ?t (COUNT(DISTINCT ?c) AS ?k0) FROM <#ri>
+            WHERE {
+              <info:fedora/" . $pid . "> <info:fedora/fedora-system:def/relations-external#hasConcept> ?o .
+              ?o <info:fedora/fedora-system:def/model#state> <info:fedora/fedora-system:def/model#Active> .
+              ?o <info:fedora/fedora-system:def/model#label> ?l .
+              OPTIONAL {
+                ?o <info:fedora/fedora-system:def/relations-external#hasConcept> ?c .
+                ?c <info:fedora/fedora-system:def/model#state> <info:fedora/fedora-system:def/model#Active> .
+              }
+            }
+            GROUP BY ?o (STR(?l) AS ?t)
+            ORDER BY ?t";
 }
 /*
  * Enable verbose levels of debugging
@@ -586,7 +605,7 @@ function si_exhibition_generate_child_resource_query($pid, array $resource_types
   $limit = isset($limit) ? " $limit" : '1000000';
   $offset = isset($offset) ? " $offset" : '0';
   $sort = strtoupper($sort);
-  $to_return = "select ?object ?title ?model from <#ri> where {
+  /*$to_return = "select ?object ?title ?model from <#ri> where {
     ?object <fedora-model:state> <fedora-model:Active>;
             <fedora-model:label> ?title;
             <fedora-model:hasModel> ?model.
@@ -598,7 +617,20 @@ function si_exhibition_generate_child_resource_query($pid, array $resource_types
 		}	 
     ORDER BY {$sort}(?title)
 		LIMIT {$limit}
-		OFFSET {$offset}";
+		OFFSET {$offset}";*/
+		$to_return = "select ?object ?title ?model from <#ri> where {
+          <info:fedora/" . $pid . "> <info:fedora/fedora-system:def/relations-external#hasResource> ?object .
+          ?object <info:fedora/fedora-system:def/model#state> <info:fedora/fedora-system:def/model#Active> .
+          ?object <info:fedora/fedora-system:def/model#label> ?title .
+          ?object <info:fedora/fedora-system:def/model#hasModel> ?model;
+          FILTER(
+          ".$limit_types."
+              !sameTerm(?model, <info:fedora/fedora-system:FedoraObject-3.0>) &&
+              !sameTerm(?model, <info:fedora/si:resourceCModel>))
+        }
+        ORDER BY {$sort}(?title)
+        OFFSET {$offset}
+        LIMIT {$limit}";
 	si_exhibition_debug('<pre>'.htmlspecialchars($to_return).'</pre>');
   return $to_return;
 }
