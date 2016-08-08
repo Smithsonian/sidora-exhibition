@@ -8,6 +8,7 @@ if (!isset($variables['sidora_exhibition']['logo'])) {
 $extra_css = (isset($variables['sidora_exhibition']['extra_css'])?$variables['sidora_exhibition']['extra_css']:''); 
 if (!empty($extra_css)){
  print "<style>";
+ print "\n body, a, a:link, a:visited { background-color:rgba(0,0,0,0.0); color: rgba(255,255,255);} \n";
  print $extra_css;
  print "</style>";
 }
