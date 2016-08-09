@@ -685,7 +685,12 @@ function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $
   }
   $ch = curl_init();
   $timeout = 60;
-  curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+  if (strpos($url_to_get, '?') === FALSE) {
+    curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+  }
+  else {
+    curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+  }
   //curl_setopt($ch, CURLOPT_URL, $url_to_get);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
   curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
@@ -792,7 +797,12 @@ function si_exhibition_meta_string_for_xslt_by_id($pid){
       urlencode($pid);
     $ch = curl_init();
     $timeout = 60;
-    curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+    if (strpos($url_to_get, '?') === FALSE) {
+      curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+    }
+    else {
+      curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+    }
     //curl_setopt($ch, CURLOPT_URL, $url_to_get);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
@@ -891,7 +901,12 @@ function si_exhibition_xsl_string($pid){
       urlencode($pid);
     $ch = curl_init();
     $timeout = 60;
-    curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+    if (strpos($url_to_get, '?') === FALSE) {
+      curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+    }
+    else {
+      curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+    }
     //curl_setopt($ch, CURLOPT_URL, $url_to_get);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
@@ -2047,7 +2062,12 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
     urlencode($pid);
   $ch = curl_init();
   $timeout = 60;
-  curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+  if (strpos($url_to_get, '?') === FALSE) {
+    curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+  }
+  else {
+    curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+  }
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
   curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
   curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
@@ -2195,7 +2215,12 @@ function si_exhibition_get_visibility_tree($pid = NULL) {
   }
   $ch = curl_init();
   $timeout = 60;
-  curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+  if (strpos($url_to_get, '?') === FALSE) {
+    curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+  }
+  else {
+    curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+  }
   //curl_setopt($ch, CURLOPT_URL, $url_to_get);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
   curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
@@ -2453,7 +2478,12 @@ function si_exhibition_get_obj_datastream_content($pid) {
       $url_to_get = variable_get('si_exhibition_workbench_xsl', '') . 'file_extension/' . urlencode($pid);
       $ch = curl_init();
       $timeout = 60;
-      curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+      if (strpos($url_to_get, '?') === FALSE) {
+        curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+      }
+      else {
+        curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+      }
       //curl_setopt($ch, CURLOPT_URL, $url_to_get);
       curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
       curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
