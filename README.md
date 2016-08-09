@@ -1,3 +1,3 @@
-Version 0.4.4
+Version 0.5.0
 
-Readme.txt within the module and theme to describe each individually
+Jena/Fuseki initial release
