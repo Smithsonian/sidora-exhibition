@@ -14,6 +14,8 @@ function si_exhibition_ds(pid, dsid, title) {
         });
     return false; // Prevent Event Propagation
     */
+    jQuery("#exhibition_gray_overlay").remove();
+    jQuery("body").append("<div id='exhibition_gray_overlay' style='background-color:rgba(0,0,0,0.5);width:100%;height:100%;position:absolute;top:0;left:0'>")
     $.ajax({
       type: "GET",
       url: Drupal.settings.basePath + "si/exhibition/datastream",
@@ -59,7 +61,9 @@ function si_exhibition_ds(pid, dsid, title) {
           options:    {onFinish: function(){recolorShadowboxTable();}}
         });
       }
-    );
+    ).always(function(jqXHR, textStatus) {
+      jQuery("#exhibition_gray_overlay").fadeOut();
+    });
   })(jQuery);
   return false; // Prevent Event Propagation
 }
