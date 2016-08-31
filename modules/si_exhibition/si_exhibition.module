@@ -287,7 +287,7 @@ function si_exhibition_block_view($delta='') {
         $se = si_exhibition_get_item_display_config($pid_for_config, arg(2));
 
         $block = array(
-          'subject' => 'Test',
+          'subject' => '',
           'content' => (isset($se[$delta])?$se[$delta]:''),
         );
         
