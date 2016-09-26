@@ -15,7 +15,8 @@ function si_exhibition_ds(pid, dsid, title) {
     return false; // Prevent Event Propagation
     */
     jQuery("#exhibition_gray_overlay").remove();
-    jQuery("body").append("<div id='exhibition_gray_overlay' style='background-color:rgba(0,0,0,0.2);width:100%;height:100%;position:absolute;top:0;left:0'>")
+    jQuery("body").append("<div id='exhibition_gray_overlay' style='background-color:rgba(0,0,0,1);opacity:0.5;width:100%;height:100%;position:absolute;top:0;left:0'>");
+    jQuery("#exhibition_gray_overlay").append('<div id="sb-loading"><div id="sb-loading-inner"><span>&nbsp;</span></div></div>');
     $.ajax({
       type: "GET",
       url: Drupal.settings.basePath + "si/exhibition/datastream",
