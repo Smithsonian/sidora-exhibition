@@ -175,14 +175,14 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     if (!empty($available_view)){ $display['view'] = $available_view;  }
     $preview = '';
     if (array_search($display['view'], $resource['datastreams']) !== FALSE) {
-			$thumbnail_url = url("fedora/repository/{$resource['pid']}/TN");
+	$thumbnail_url = url("fedora/repository/{$resource['pid']}/TN");
       if (array_search('si:datasetCModel', $resource['models']) !== FALSE) {
-			  $thumbnail_url = $GLOBALS['base_url'].'/'.drupal_get_path('module','si_exhibition').'/images/icons/x-office-spreadsheet.png';
-			}	
-			if ((array_search('si:fieldbookCModel', $resource['models']) !== FALSE) && (array_search('TN', $resource['datastreams']) === FALSE)){
-			  $thumbnail_url = $GLOBALS['base_url'].'/'.drupal_get_path('module','si_exhibition').'/images/icons/application-pdf.png';
-			}	
-			$view_preview = (isset($display['tn']) && (array_search('TN', $resource['datastreams']) !== FALSE || array_search('si:datasetCModel', $resource['models']) !== FALSE || in_array('si:fieldbookCModel',$resource['models']))) ? "<img alt='image thumbnail for {$resource['label']}' class='resource-tn' src='$thumbnail_url'/>" : '';
+        $thumbnail_url = $GLOBALS['base_url'].'/'.drupal_get_path('module','si_exhibition').'/images/icons/x-office-spreadsheet.png';
+      }	
+      if ((array_search('si:fieldbookCModel', $resource['models']) !== FALSE) && (array_search('TN', $resource['datastreams']) === FALSE)){
+        $thumbnail_url = $GLOBALS['base_url'].'/'.drupal_get_path('module','si_exhibition').'/images/icons/application-pdf.png';
+      }	
+     $view_preview = (isset($display['tn']) && (array_search('TN', $resource['datastreams']) !== FALSE || array_search('si:datasetCModel', $resource['models']) !== FALSE || in_array('si:fieldbookCModel',$resource['models']))) ? "<img alt='image thumbnail for {$resource['label']}' class='resource-tn' src='$thumbnail_url'/>" : '';
       if (isset($display['url'])) {
         $prefix = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" rel="shadowbox" title="' . $resource['label'] . '">';
         $postfix = '</a>';
