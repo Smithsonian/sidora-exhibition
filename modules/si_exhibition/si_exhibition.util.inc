@@ -156,9 +156,11 @@ function si_exhibition_get_parent_info_by_id($pid, $skipNonTreeParents = false) 
   $query = si_exhibition_generate_parent_concept_query($pid);
   //$results = $repo->ri->itqlQuery($query);
   $results = $repo->ri->sparqlQuery($query);
-  $parents = array_map(function($o) {
-    return array('pid' => $o['object']['value'], 'label' => $o['title']['value']); 
-  }, $results);
+  $my_func = function($o) {
+    $to_return = array('pid' => $o['object']['value'], 'label' => $o['title']['value']);
+    return $to_return;
+  };
+  $parents = array_map($my_func, $results);
   
   // @todo replace the checks for each objects existance once we have the appropriate information in the rels to determine if its accessible.
   if ($skipNonTreeParents) {
@@ -298,7 +300,7 @@ function si_exhibition_debug($message, $object = NULL){
  */
 function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE, $permanent = FALSE){
   global $tnum;
-  si_exhibition_debug("si_exhibition_cache $cache_name | $cache_data_index | $overwrite | $permanent |");
+  si_exhibition_debug("si_exhibition_cache " . json_encode($cache_name) . " | " . json_encode($cache_data_index) . " | " . json_encode($overwrite) . " | " . json_encode($permanent) ." |");
   if (!variable_get('si_exhibition_cache_on',TRUE)){
     si_exhibition_debug("si_exhibition_cache is turned off");
     if ($overwrite !== FALSE) return $overwrite; //If caching is turned off, don't use caching!

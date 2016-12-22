@@ -48,7 +48,7 @@ function si_exhibition_preprocess_si_exhibition_resources(array &$variables) {
   // Pager
   $variables['total'] = $total = count($resources);
   si_exhibition_pager_init($total, $limit, 0);
-  $variables['pager'] = theme('pager', array('BBB_UNKNOWN'=>NULL, 'limit'=>$limit, 'start'=>0, 'BBB_UNKNOWN_2'=>NULL, 'per_page'=>10));
+  $variables['pager'] = theme('pager', array('limit'=>$limit, 'start'=>0, 'per_page'=>10));
 }
 
 /**
@@ -157,8 +157,8 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   print '</div>';
   var_dump(array_intersect_key($display_definitions, array_flip($resource['models'])));
   */
- 
-  $display = array_pop(array_intersect_key($display_definitions, array_flip($resource['models']))); // Assuming an object can't be two types of resources.
+  $aik = array_intersect_key($display_definitions, array_flip($resource['models']));
+  $display = array_pop($aik); // Assuming an object can't be two types of resources.
 	$display['url'] = (isset($display['url'])?$display['url']:'');
   $label = $resource['label'];
   // Metadata

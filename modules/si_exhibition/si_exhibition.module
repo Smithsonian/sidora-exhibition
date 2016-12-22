@@ -251,7 +251,8 @@ function si_exhibition_block_view($delta='') {
 
   // Only ever display in /fedora/* when the user has access and the resource exists.
   if (arg(0) == 'fedora' && !$forbidden && !$not_found) {
-    $pid_for_config = array_shift(si_exhibition_get_pid_path_to_showing_concept());
+    $pptsc = si_exhibition_get_pid_path_to_showing_concept();
+    $pid_for_config = array_shift($pptsc);
     $pid = (arg(2) ? arg(2) : variable_get('fedora_repository_pid', 'si:root'));
     
     switch ($delta) {
@@ -369,7 +370,8 @@ function si_exhibition_preprocess_page(&$variables) {
     $variables['theme_hook_suggestions'][] = 'page_exhibition';
     $variables['title'] = NULL; // Title is displayed as part of the page content.
     $se = array();
-    $pid_for_config = array_shift(si_exhibition_get_pid_path_to_showing_concept());
+    $pptsc = si_exhibition_get_pid_path_to_showing_concept();
+    $pid_for_config = array_shift($pptsc);
     try {
       $se = si_exhibition_get_item_display_config($pid_for_config, arg(2));
       if ($se['error'] == true) {
@@ -383,7 +385,8 @@ function si_exhibition_preprocess_page(&$variables) {
         if (array_key_exists('title', $se)) $variables['site_name'] = $se['title']; else $variables['site_name'] = '';
         //$variables['site_slogan'] = ' sitey slogany'.arg(2);
         $variables['sidora_exhibition'] = $se;
-        $variables['primary_links_tree'] = drupal_render(menu_tree_output(menu_tree_all_data('main-menu')));
+        $mto = menu_tree_output(menu_tree_all_data('main-menu'));
+        $variables['primary_links_tree'] = drupal_render($mto);
       }
     } catch(Exception $e) {
       watchdog('exhibition', 'si_exhibition_preprocess page exception:'.$e->getMessage().'  '.$e->getTraceAsString());
@@ -2345,7 +2348,7 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array(), $pat
       print "\nchildren:";
       var_dump($children);
       print "\nfor pid:";
-      var_dump($pid);//BBB
+      var_dump($pid);
       */
       $path_from_root_to_current_pid[] = $pid;
       //Get the children
