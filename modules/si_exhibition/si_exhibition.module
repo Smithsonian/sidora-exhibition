@@ -655,7 +655,7 @@ function si_exhibition_jw_player($pid, $file_path){
 document.addEventListener("DOMContentLoaded",function() {
   jwplayer("mediaplayer").setup({
     file: "'.$base_url.'/fedora/repository/'.$pid.'/'.$file_path.'",
-    image: "'.$base_url.'/fedora/repository/'.$pid.'/TN",
+    image: "'.$base_url.'/fedora/repository/'.$pid.'/TN.tn.jpg",
     width: "480",
     height: "270"
   });
