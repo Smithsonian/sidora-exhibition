@@ -83,10 +83,21 @@ function si_exhibition_menu() {
       'access callback' => true,
       'type' => MENU_CALLBACK,
     ),
+    'cache' => array(
+      'title' => 'Clear exhibition cache',
+      'description' => 'clear the exhibition cache',
+      'page callback' => 'si_exhibition_clear_cache',
+      'access callback' => true,
+      'type' => MENU_CALLBACK,
+    ),
   );
 }
 
-/**
+function si_exhibition_clear_cache(){
+	cache_clear_all('si_exhibition_cache_','cache',TRUE);
+ }
+ 
+ /**
  * Implements hook_theme().
  */
 function si_exhibition_theme($existing, $type, $theme, $path) {
