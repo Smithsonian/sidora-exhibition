@@ -335,6 +335,7 @@ function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE,
     }
     si_exhibition_debug("si_exhibition_cache setting cache $prefix | $cache_name", $data);
     cache_set($prefix.$cache_name, $data, $cache_table_for_clearing, $expire_date_time);
+    $cache = cache_get($prefix.$cache_name, $cache_table_for_clearing);
     return $overwrite;
   }
   si_exhibition_debug("si_exhibition_cache returning nothing found in cache");
