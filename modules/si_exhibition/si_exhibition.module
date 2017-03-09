@@ -265,7 +265,7 @@ function si_exhibition_block_view($delta='') {
     $pptsc = si_exhibition_get_pid_path_to_showing_concept();
     $pid_for_config = array_shift($pptsc);
     $pid = (arg(2) ? arg(2) : variable_get('fedora_repository_pid', 'si:root'));
-    
+
     switch ($delta) {
       case "seu_nav":
         $block = array(
@@ -385,7 +385,7 @@ function si_exhibition_preprocess_page(&$variables) {
     $pid_for_config = array_shift($pptsc);
     try {
       $se = si_exhibition_get_item_display_config($pid_for_config, arg(2));
-      if ($se['error'] == true) {
+			if ($se['error'] == true) {
         $show_exhibition = false;
       }
       //logo is the image
@@ -851,7 +851,6 @@ function si_exhibition_meta_string_for_xslt_by_id($pid){
 
     curl_close($ch);
     $xsl_config = json_decode($data);
-
   }
   $specific_meta = '';
   if (!empty($xsl_config)){
@@ -2675,3 +2674,12 @@ function si_exhibition_islandora_view_datastream_retrieve_file_uri(AbstractDatas
   }
   return $file_uri;
 }
+function si_exhibition_get_parent_xsl($pid_to_check) {
+  $pptsc = si_exhibition_get_pid_path_to_showing_concept();
+  $pid_for_config = array_shift($pptsc);
+  $se = si_exhibition_get_item_display_config($pid_for_config, arg(2));
+  if ((isset($se['xslt'])) && (!empty($se['xslt'])) && ($se['xslt'] != '')) {
+    return $pid_for_config;
+  }
+  return arg(2);
+} 	 

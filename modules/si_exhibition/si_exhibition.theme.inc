@@ -388,10 +388,11 @@ function theme_si_exhibition_metadata_xmls($vars){
   $output = $datastream_content;
   $doc = new DOMDocument();
   $xsl = new XSLTProcessor();
-  $xsl_string = si_exhibition_xsl_string($pid);
+  $pid_to_check = si_exhibition_get_parent_xsl($pid);
+  $xsl_string = si_exhibition_xsl_string($pid_to_check);
   if ($xsl_string === FALSE){
     //No XSL string (bad news)
-    //drupal_set_message("Configuration problem, could not obtain XSL information from configured XSL provider. This usually means the exhibition server cannot contact the workbench server.", "error");
+    //drupal_set_message("Configuration problem, could not obtain <a href="errorlog.txt"></a>XSL information from configured XSL provider. This usually means the exhibition server cannot contact the workbench server.", "error");
     watchdog("exhibition",'xsl_string was bad for:'.$pid);
     return '';
   }
