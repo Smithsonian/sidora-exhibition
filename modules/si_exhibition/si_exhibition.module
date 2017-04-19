@@ -629,6 +629,11 @@ function si_exhibition_sidora_viewer($object){
       array('%pid' => $pid, '%view_id' => $viewer)
     );
   }
+  if ($viewer == 'OpenSeaDragon') {
+    require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
+    $vis_obj = si_exhibition_get_visibility_object($pid);
+    if ($vis_obj['show_degraded']) $viewer = 'browser_degraded';
+  }
   ob_start();
   print "Ready to display using the sidora_viewer:".$viewer;
   $debug_result = ob_get_clean();
@@ -650,6 +655,13 @@ function si_exhibition_sidora_viewer($object){
       break;
     case 'JW Video Player':
       si_exhibition_jw_player($pid, 'MP4/file_name_spoof.mp4');
+      break;
+    case 'browser_degraded':
+      $debug_result = ob_get_clean();
+      si_exhibition_debug($debug_result);
+      $level = si_exhibition_get_degradation_level($pid);
+      ob_start();
+      sidora_view_degraded_img($pid, 'OBJ', '0', $level);
       break;
     default:
       echo $viewer;
@@ -693,7 +705,7 @@ function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $
   //Pull the info about the viewer for the object
   
   $url_to_get = variable_get('si_exhibition_workbench_xsl', '');
-  $url_to_get .= implode('/' , array_map('urlencode',$callback_args));
+$url_to_get .= implode('/' , array_map('urlencode',$callback_args));
   if ($get_params){
     $url_to_get .= '?' . $_SERVER['QUERY_STRING'];
   }
@@ -759,14 +771,11 @@ function si_exhibition_forward_direct_open_access($callback_args, $raw = TRUE, $
  */
 function si_exhibition_check_view_permission($object_pid) {
   $xacml_dsid = 'POLICY';
-
-
   // when we call in from top level collections in JS get get the
   // pid being undefined
   if($object_pid == 'undefined' || !$object_pid) {
     $object_pid = variable_get('fedora_repository_pid', 'islandora:top');
   }
-  
   return true;
   /*
   XACML code unused
@@ -776,15 +785,11 @@ function si_exhibition_check_view_permission($object_pid) {
     return false;
   }
   $datastreams = $object->get_datastreams_list_as_array();
-
   module_load_include('inc', 'fedora_repository', 'ContentModel');
-
   if(array_key_exists($xacml_dsid, $datastreams)) {
     module_load_include('inc', 'islandora_xacml_api', 'XacmlException');
-
     // here we populate the form
     $xml = $object->get_datastream_dissemination($xacml_dsid);
-
     // some basic error handling
     try {
       $xacml = new Xacml($xml);
@@ -2430,8 +2435,8 @@ function exhibition_resources_form($form, &$form_state){
       'images' => t('Images'),
       'pdf' => t('Digitized Text (pdf)'),
       'csv' => t('Tabular Datasets'),
-			'audio' => t('Audio'),
-			'video' => t('Video'),
+      'audio' => t('Audio'),
+      'video' => t('Video'),
     ),
   );
   $form['limit'] = array(
@@ -2470,11 +2475,11 @@ function si_exhibition_get_obj_datastream_content($pid) {
   $repo = tuque_wrapper_get_repository_instance();
   $object = $repo->getObject($pid);
   foreach($object as $dsid_loop=>$datastream_loop) {
-	  if ($dsid_loop == 'OBJ'){
+    if ($dsid_loop == 'OBJ'){
       $datastream = $datastream_loop;
       $datastream_content = $datastream->content;
-		}	
-	}	
+    }	
+   }	
   if (empty($datastream_content)){
     print t('Datastream not found by that name');
     watchdog('exhibition','Obj datastream content not exist:'.$pid);
@@ -2483,26 +2488,26 @@ function si_exhibition_get_obj_datastream_content($pid) {
   //datastream_content is now set.  perform the output
   $mime_type = (empty($datastream))?'text/xml':$datastream->mimeType;
   header('Content-length: ' . strlen($datastream_content));
-    // Prevent adding on a duplicate extension.
-    $label = $datastream->label;
-    if (strtoupper($label) != 'OBJ'){
-		  $filename = $datastream->label;
-    }else{
-      $url_to_get = variable_get('si_exhibition_workbench_xsl', '') . 'file_extension/' . urlencode($pid);
-      $ch = curl_init();
-      $timeout = 60;
-      if (strpos($url_to_get, '?') === FALSE) {
-        curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
-      }
-      else {
-        curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
-      }
-      //curl_setopt($ch, CURLOPT_URL, $url_to_get);
-      curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-      curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
-      curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
-      curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
-      curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+  // Prevent adding on a duplicate extension.
+  $label = $datastream->label;
+  if (strtoupper($label) != 'OBJ'){
+    $filename = $datastream->label;
+  }else{
+    $url_to_get = variable_get('si_exhibition_workbench_xsl', '') . 'file_extension/' . urlencode($pid);
+    $ch = curl_init();
+    $timeout = 60;
+    if (strpos($url_to_get, '?') === FALSE) {
+      curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+    }
+    else {
+      curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+    }
+    //curl_setopt($ch, CURLOPT_URL, $url_to_get);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
       $data = curl_exec($ch);
       if ($data === FALSE){
         /*
@@ -2533,14 +2538,13 @@ function si_exhibition_get_obj_datastream_content($pid) {
       si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
       */
       curl_close($ch);
-
       $extension = json_decode($data);
-			$filename = $pid.'_OBJ'.$extension;//get_suggest_filename($label, $mime_type);*/
-		}	
+      $filename = $pid.'_OBJ'.$extension;//get_suggest_filename($label, $mime_type);*/
+    }	
     header("Content-type: $mime_type");
     header("Content-Disposition: attachment; filename=\"$filename\"");
     print $datastream_content;
-		drupal_exit();
+    drupal_exit();
 }		
 function si_exhibition_deliver_streaming($pid, $dsid = 'OBJ') {
   $repo = tuque_wrapper_get_repository_instance();
@@ -2682,4 +2686,13 @@ function si_exhibition_get_parent_xsl($pid_to_check) {
     return $pid_for_config;
   }
   return arg(2);
+} 	 
+function si_exhibition_get_degradation_level($pid_to_check) {
+  $pptsc = si_exhibition_get_pid_path_to_showing_concept();
+  $pid_for_config = array_shift($pptsc);
+  $se = si_exhibition_get_item_display_config($pid_for_config, arg(2));
+  if (isset($se['image_degradation'])) {
+    return $se['image_degradation'];
+  }
+  return '2';
 } 	 

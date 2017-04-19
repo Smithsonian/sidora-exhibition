@@ -159,7 +159,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   */
   $aik = array_intersect_key($display_definitions, array_flip($resource['models']));
   $display = array_pop($aik); // Assuming an object can't be two types of resources.
-	$display['url'] = (isset($display['url'])?$display['url']:'');
+  $display['url'] = (isset($display['url'])?$display['url']:'');
   $label = $resource['label'];
   // Metadata
   //$display_metadata_function = 'return si_exhibition_ds("' . $resource['pid'] . '", "METADATA")';
@@ -184,10 +184,14 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       }	
      $view_preview = (isset($display['tn']) && (array_search('TN', $resource['datastreams']) !== FALSE || array_search('si:datasetCModel', $resource['models']) !== FALSE || in_array('si:fieldbookCModel',$resource['models']))) ? "<img alt='image thumbnail for {$resource['label']}' class='resource-tn' src='$thumbnail_url'/>" : '';
       if (isset($display['url'])) {
-        $prefix = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" rel="shadowbox" title="' . $resource['label'] . '">';
-        $postfix = '</a>';
-        $view = $prefix . $view_preview . $postfix;
-        $preview = $prefix . 'Preview' . $postfix;
+        if ((array_search('si:generalImageCModel',$resource['models']) !== FALSE) && ($resource['visibility']['show_degraded'])) {
+	  $prefix = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" target="_blank" title="' . $resource['label'] . '">';
+       }else{
+	  $prefix = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" rel="shadowbox" title="' . $resource['label'] . '">';
+       }
+       $postfix = '</a>';
+       $view = $prefix . $view_preview . $postfix;
+       $preview = $prefix . 'Preview' . $postfix;
       }
       else {
         $display_datastream_function = "return {$display['func']}('{$resource['pid']}', '{$display['view']}');";

@@ -38,6 +38,24 @@ function sidora_view_openseadragon($pid, $dsid, $version='0'){
   print "\r\n".'</html>                                                                                                     ';
   drupal_exit();
 }
+function sidora_view_degraded_img($pid, $dsid, $version='0', $level='2'){
+  $osd_js_path = variable_get('osd_library_location', $GLOBALS['base_url'].'/sites/all/libraries/openseadragon-djatoka/');
+  $jquery = variable_get('osd_jquery_library_location', $GLOBALS['base_url'].'/sites/all/libraries/openseadragon-djatoka/jquery/jquery-2.1.4.min.js');
+  $local_resolver = variable_get('osd_local_resolver_service', $GLOBALS['base_url'].'/'.'sidora/osd/');
+  print "\r\n".'    <script src="'.$jquery.'"></script>';
+  print "\r\n".'    <script src="'.$osd_js_path.'openseadragon/openseadragon.min.js"></script>';
+  print "\r\n".'    <script src="'.$osd_js_path.'js/djtilesource.js"></script>';
+  print "\r\n".  '<script>';
+  print "\r\n".'  var service = "' . $local_resolver.$pid.'/'.$dsid.'/'.$version . '";';
+  print "\r\n".'          var id = "{replacer}";';
+  print "\r\n".'          var settings = {tileSize: 256, tileOverlap: 0};';
+  print "\r\n".'          var tileSource = new OpenSeadragon.DjatokaTileSource(service, id, settings);';
+  print "\r\n".' var tileURL = tileSource.getTileUrl(' . $level . ',0,0) + "&degraded=true";';
+  print "\r\n".' jQuery.get(tileURL, function(data) { window.open(data,"_self"); });';
+  print"\r\n".  '</script>';
+  drupal_exit();
+}
+
 /*
  * Returns the full view for the phpexcelreader plus javascript
  */
