@@ -184,11 +184,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       }	
      $view_preview = (isset($display['tn']) && (array_search('TN', $resource['datastreams']) !== FALSE || array_search('si:datasetCModel', $resource['models']) !== FALSE || in_array('si:fieldbookCModel',$resource['models']))) ? "<img alt='image thumbnail for {$resource['label']}' class='resource-tn' src='$thumbnail_url'/>" : '';
       if (isset($display['url'])) {
-        if ((array_search('si:generalImageCModel',$resource['models']) !== FALSE) && ($resource['visibility']['show_degraded'])) {
-	  $prefix = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" target="_blank" title="' . $resource['label'] . '">';
-       }else{
 	  $prefix = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" rel="shadowbox" title="' . $resource['label'] . '">';
-       }
        $postfix = '</a>';
        $view = $prefix . $view_preview . $postfix;
        $preview = $prefix . 'Preview' . $postfix;
