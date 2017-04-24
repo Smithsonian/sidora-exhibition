@@ -275,9 +275,10 @@ function si_exhibition_generate_child_concept_query($pid) {
 /*
  * Enable verbose levels of debugging
  */
-function si_exhibition_debug($message, $object = NULL){
+function si_exhibition_debug($message, $object = NULL, $also_watchdog = FALSE){
   if (variable_get('si_exhibition_debug',FALSE)){
     drupal_set_message($message);
+    $content = '';
     if (!empty($object)){
       ob_start();
       print '<div id="" style="overflow-y: scroll; max-height:400px;">';
@@ -287,6 +288,9 @@ function si_exhibition_debug($message, $object = NULL){
       print '</div>';
       $content = ob_get_clean();
       drupal_set_message($content);
+    }
+    if ($also_watchdog) {
+      watchdog('sidora_debug', $message . $content);
     }
   }
 }
@@ -300,7 +304,7 @@ function si_exhibition_debug($message, $object = NULL){
  */
 function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE, $permanent = FALSE){
   global $tnum;
-  si_exhibition_debug("si_exhibition_cache " . json_encode($cache_name) . " | " . json_encode($cache_data_index) . " | " . json_encode($overwrite) . " | " . json_encode($permanent) ." |");
+  si_exhibition_debug("si_exhibition_cache <pre>" . json_encode($cache_name) . " | " . json_encode($cache_data_index) . " | " . json_encode($overwrite) . " | " . json_encode($permanent) ." |</pre>");
   if (!variable_get('si_exhibition_cache_on',TRUE)){
     si_exhibition_debug("si_exhibition_cache is turned off");
     if ($overwrite !== FALSE) return $overwrite; //If caching is turned off, don't use caching!
@@ -380,21 +384,34 @@ function si_exhibition_cron_cache($function_name = FALSE, $arguments = FALSE){
  */
 function si_exhibition_get_pid_path_to_showing_concept($url = NULL) {
   if (!empty($url)) {
+    si_exhibition_debug('pid path via non-empty url' . $url, NULL, TRUE);
     return si_exhibition_get_pid_path_to_concept_by_url($url);
   }
   $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['REQUEST_URI']);
   if (!empty($pid_path)) {
+    si_exhibition_debug('setting session for pid path via server request_uri:' . $_SERVER['REQUEST_URI'], NULL, TRUE);
     $_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
     return $pid_path;
   }
   $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['HTTP_REFERER']);
   if (!empty($pid_path)) {
+    si_exhibition_debug('setting session for pid path via server referrer:' . $_SERVER['HTTP_REFERER'], NULL, TRUE);
     $_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
     return $pid_path;
   }
   if (!empty($_SESSION['si_exhibition_latest_pid_path'])){
+    si_exhibition_debug('returning pid path based on the existing session:' . json_encode($_SESSION['si_exhibition_latest_pid_path']), NULL, TRUE);
     return $_SESSION['si_exhibition_latest_pid_path'];
   }
+  si_exhibition_debug("Did not find a good path, here is all the info:".
+  ' $_SESSION[si_exhibition_latest_pid_path]'.
+  (empty($_SESSION['si_exhibition_latest_pid_path'])?'empty':$_SESSION['si_exhibition_latest_pid_path']).
+  ' $_SERVER[HTTP_REFERER]'.
+  $_SERVER['HTTP_REFERER'].
+  ' $_SERVER[REQUEST_URI]'.
+  $_SERVER['REQUEST_URI'].
+  '$url'.
+  $url, $_SESSION, TRUE);
   return array();
 }
 /*

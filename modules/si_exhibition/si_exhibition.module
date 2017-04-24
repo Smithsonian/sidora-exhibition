@@ -352,8 +352,22 @@ function _si_show_exhibition(){
         $bad_path = true;
       }
     }
+    try{
+      // See if this is a resource of the final item in the path
+      $possible_parent_pid = array_values(array_slice($path_list, -1))[0];
+      $children = si_exhibition_get_child_resource_info_by_id($possible_parent_pid);
+      foreach($children as $child) {
+        if ($child['pid'] == $pid_on_url) {
+          $bad_path = false;
+        }
+      }
+    } catch(Exception $e) {
+      watchdog('exhibition', '_si_show_exhibition page exception:'.$e->getMessage().'  '.$e->getTraceAsString());
+      exit();
+    }
+ 
   }
-  $bad_path_set = TRUE;
+
   $to_return = !($bad_path);
   $cached = si_exhibition_cache($cache_name, $cache_index, $to_return);
   /*
@@ -515,8 +529,6 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     else {
       //print $dsid;//$object[$dsid]->size;
       $datastream = $object[$dsid];
-      //var_dump($datastream);
-      //var_dump($object);
       //$datastream->populateDatastreamInfo();
       //$datastream->refresh();
 
@@ -527,6 +539,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
        si_exhibition_deliver_streaming($pid, $dsid);
        exit();
       }
+      
       header("Content-Type: ".$object[$dsid]->mimetype);
       print $object[$dsid]->content;
     }
@@ -651,10 +664,10 @@ function si_exhibition_sidora_viewer($object){
       sidora_tabular_view_phpexcelreader($pid,'OBJ');
       break;
     case 'JW Audio Player':
-      si_exhibition_jw_player($pid, 'PROXY_MP3/file_name_spoof.mp3');
+      si_exhibition_jw_player($pid, 'PROXY_MP3/file_name_spoof.mp3?path='.urlencode(implode($_SESSION['si_exhibition_latest_pid_path'],",")));
       break;
     case 'JW Video Player':
-      si_exhibition_jw_player($pid, 'MP4/file_name_spoof.mp4');
+      si_exhibition_jw_player($pid, 'MP4/file_name_spoof.mp4?path='.urlencode(implode($_SESSION['si_exhibition_latest_pid_path'],",")));
       break;
     case 'browser_degraded':
       $debug_result = ob_get_clean();
@@ -678,9 +691,10 @@ function si_exhibition_jw_player($pid, $file_path){
 document.addEventListener("DOMContentLoaded",function() {
   jwplayer("mediaplayer").setup({
     file: "'.$base_url.'/fedora/repository/'.$pid.'/'.$file_path.'",
-    image: "'.$base_url.'/fedora/repository/'.$pid.'/TN.tn.jpg",
+    image: "'.$base_url.'/fedora/repository/'.$pid.'/TN/tn.jpg",
     width: "480",
-    height: "270"
+    height: "270",
+    logo : { hide: "true" }
   });
 });
 </script>
@@ -1966,6 +1980,9 @@ function si_exhibition_get_datastream_as_json() {
     'METADATA_XMLS' => 'si_exhibition_metadata_xmls'
   );
   $output = isset($theme[$dsid]) ? theme($theme[$dsid], array('pid'=>$pid)) : t('An Error Occured.');
+  if ($dsid == 'METADATA_XMLS') {
+    header("Content-type: text/xml");
+  }
   print json_encode(array('output' => $output));
   drupal_exit();
 }
@@ -2048,7 +2065,7 @@ function si_exhibition_sidora_debug($debug_string, $cgi = NULL) {
  * Will return NULL on errors and may set drupal error messages during the error processing
  */
 function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_messages = TRUE){
-  si_exhibition_debug("Looking for item_display_config.");
+  si_exhibition_debug("Looking for item_display_config for pid:$pid",NULL,TRUE);
   
   $path = filter_input(INPUT_GET, 'path');
   $pid_on_url = arg(2); 
@@ -2122,6 +2139,8 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
   if (!empty($se['error'])){
     //No longer give download message, instead fully hide the data.  drupal_not_found() produces infinite loop
     watchdog('exhibition','Exhibition Config indicated this is not a good item to get:'.$url_to_get);
+
+    watchdog('exhibition',"Coming from:".exhibition_debug_string_backtrace());
     drupal_exit();
   }
   if (isset($se['nav_type']) && $se['nav_type'] == 'tree'){
@@ -2186,6 +2205,18 @@ function si_exhibition_get_printable_tree($tree_pos, $current_path = ''){
   }
   $output .= '</li>';
   return $output;
+}
+function exhibition_debug_string_backtrace() {
+  ob_start();
+  debug_print_backtrace();
+  $trace = ob_get_contents();
+  ob_end_clean();
+
+  // Remove first item from backtrace as it's this function which
+  // is redundant.
+  $trace = preg_replace ('/^#0\s+' . __FUNCTION__ . "[^\n]*\n/", '', $trace, 1);
+
+  return $trace;
 }
 /**
  * Return an associative array of the visibility for the input pid
@@ -2551,8 +2582,27 @@ function si_exhibition_deliver_streaming($pid, $dsid = 'OBJ') {
   $object = $repo->getObject($pid);
   $datastream = $object[$dsid];
   header('Content-type: ' . $datastream->mimetype);
-  if ($datastream->controlGroup == 'M' || $datastream->controlGroup == 'X') {
-    header('Content-length: ' . $datastream->size);
+  try{
+    if ($datastream->controlGroup == 'M' || $datastream->controlGroup == 'X') {
+      header('Content-length: ' . $datastream->size);
+    }
+  }catch(Exception $exc){
+
+    $url = variable_get('fedora_base_url', 'http://localhost:8080/fedora') . "/objects/".urlencode($pid)."/datastreams/$dsid/history?format=xml";
+      $ch = curl_init();
+      curl_setopt($ch, CURLOPT_URL, $url);
+      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+      curl_setopt($ch, CURLOPT_USERPWD, ":");
+      curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+      $output = curl_exec($ch);
+      $info = curl_getinfo($ch);
+      curl_close($ch);
+      $tagname = 'dsSize';
+      $pattern = "@<$tagname(?:\s.*?!/)?>(.*?)</$tagname\s*>@s";  //<?
+      $dsSize = "";
+      preg_match($pattern, $output, $matches);
+      $dsSize = $matches[1];
+      header('Content-length: ' . $dsSize);
   }
   $chunk_headers = si_exhibition_islandora_view_datastream_set_chunk_headers($datastream);
   si_exhibition_islandora_view_datastream_deliver_chunks($datastream, $chunk_headers);
@@ -2666,7 +2716,8 @@ function si_exhibition_islandora_view_datastream_deliver_chunks(AbstractDatastre
  *   The URI of the file.
  */
 function si_exhibition_islandora_view_datastream_retrieve_file_uri(AbstractDatastream $datastream, $extension = '') {
-  $file_uri = 'temporary://chunk_' . $datastream->parent->id . '_' . $datastream->id . '_' . $datastream->createdDate->getTimestamp() . '.' . $extension;
+  $file_uri = 'temporary://chunk_' . $datastream->parent->id . '_' . $datastream->id . '.' . $extension;
+  //$file_uri = 'temporary://chunk_' . $datastream->parent->id . '_' . $datastream->id . '_' . $datastream->createdDate->getTimestamp() . '.' . $extension;
   if (!file_exists($file_uri)) {
     $file = new stdClass();
     $file->uri = $file_uri;

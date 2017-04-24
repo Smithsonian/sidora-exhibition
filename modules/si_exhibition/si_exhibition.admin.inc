@@ -103,6 +103,9 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#maxlength' => 1024,
     ),
   );
+  if (!empty($_GET['session_show'])){
+    var_dump($_SESSION);
+  }
   _sidora_admin_settings_add_viewer_configs($form);
   return system_settings_form($form);
 }

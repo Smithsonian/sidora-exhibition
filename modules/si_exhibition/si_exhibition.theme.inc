@@ -388,7 +388,10 @@ function theme_si_exhibition_metadata_xmls($vars){
   $output = $datastream_content;
   $doc = new DOMDocument();
   $xsl = new XSLTProcessor();
-  $pid_to_check = si_exhibition_get_parent_xsl($pid);
+  $pid_to_check = $pid;
+  if (strpos(strtolower($vis_obj['type']),'concept') !== false) {
+    $pid_to_check = si_exhibition_get_parent_xsl($pid);
+  } 
   $xsl_string = si_exhibition_xsl_string($pid_to_check);
   if ($xsl_string === FALSE){
     //No XSL string (bad news)
