@@ -354,12 +354,18 @@ function _si_show_exhibition(){
     }
     try{
       // See if this is a resource of the final item in the path
-      $possible_parent_pid = array_values(array_slice($path_list, -1))[0];
-      $children = si_exhibition_get_child_resource_info_by_id($possible_parent_pid);
-      foreach($children as $child) {
-        if ($child['pid'] == $pid_on_url) {
-          $bad_path = false;
+      $pid_array_values = array_values(array_slice($path_list, -1));
+      if (is_array($pid_array_values)){
+        $possible_parent_pid = $pid_array_values[0];
+        $children = si_exhibition_get_child_resource_info_by_id($possible_parent_pid);
+        foreach($children as $child) {
+          if ($child['pid'] == $pid_on_url) {
+            $bad_path = false;
+          }
         }
+      }
+      else {
+        $bad_path = true;
       }
     } catch(Exception $e) {
       watchdog('exhibition', '_si_show_exhibition page exception:'.$e->getMessage().'  '.$e->getTraceAsString());
