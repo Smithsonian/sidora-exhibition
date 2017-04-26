@@ -651,7 +651,7 @@ function si_exhibition_sidora_viewer($object){
   if ($viewer == 'OpenSeaDragon') {
     require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
     $vis_obj = si_exhibition_get_visibility_object($pid);
-    if ($vis_obj['show_degraded']) $viewer = 'browser_degraded';
+    if (!empty($vis_obj['show_degraded'])) $viewer = 'browser_degraded';
   }
   ob_start();
   print "Ready to display using the sidora_viewer:".$viewer;
