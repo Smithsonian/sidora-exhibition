@@ -435,6 +435,7 @@ function si_exhibition_get_pid_path_to_concept_by_url($url) {
     $fr_location = strpos($request_path,'/fedora/repository/');
     if ($fr_location !== FALSE) {
       $final_pid = urldecode(substr($request_path,$fr_location+19));
+      $final_pid = substr($final_pid,0,strpos($final_pid,'/'));
       if (si_exhibition_check_valid_pid($final_pid)) {
         if (!empty($url_info['query'])) {
           parse_str($url_info['query'],$query_holder);

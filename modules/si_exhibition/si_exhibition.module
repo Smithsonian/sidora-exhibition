@@ -545,7 +545,6 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
        si_exhibition_deliver_streaming($pid, $dsid);
        exit();
       }
-      
       header("Content-Type: ".$object[$dsid]->mimetype);
       print $object[$dsid]->content;
     }
@@ -1986,7 +1985,7 @@ function si_exhibition_get_datastream_as_json() {
     'METADATA_XMLS' => 'si_exhibition_metadata_xmls'
   );
   $output = isset($theme[$dsid]) ? theme($theme[$dsid], array('pid'=>$pid)) : t('An Error Occured.');
-  if ($dsid == 'METADATA_XMLS') {
+  if ($dsid == 'METADATA_XMLS' && empty($_GET['nocontenttype'])) {
     header("Content-type: text/xml");
   }
   print json_encode(array('output' => $output));
