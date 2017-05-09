@@ -411,7 +411,7 @@ function si_exhibition_get_pid_path_to_showing_concept($url = NULL) {
   ' $_SERVER[REQUEST_URI]'.
   $_SERVER['REQUEST_URI'].
   '$url'.
-  $url, $_SESSION, TRUE);
+  $url, empty($_SESSION)?array():$_SESSION, TRUE);
   return array();
 }
 /*
