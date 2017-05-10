@@ -390,13 +390,13 @@ function si_exhibition_get_pid_path_to_showing_concept($url = NULL) {
   $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['REQUEST_URI']);
   if (!empty($pid_path)) {
     si_exhibition_debug('setting session for pid path via server request_uri:' . $_SERVER['REQUEST_URI'], NULL, TRUE);
-    $_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
+    //$_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
     return $pid_path;
   }
   $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['HTTP_REFERER']);
   if (!empty($pid_path)) {
     si_exhibition_debug('setting session for pid path via server referrer:' . $_SERVER['HTTP_REFERER'], NULL, TRUE);
-    $_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
+    //$_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
     return $pid_path;
   }
   /*

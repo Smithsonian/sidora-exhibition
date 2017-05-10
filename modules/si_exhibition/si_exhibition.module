@@ -357,9 +357,11 @@ function _si_show_exhibition(){
       if (is_array($pid_array_values)){
         $possible_parent_pid = $pid_array_values[0];
         $children = si_exhibition_get_child_resource_info_by_id($possible_parent_pid);
-        foreach($children as $child) {
-          if ($child['pid'] == $pid_on_url) {
-            $bad_path = false;
+        if (is_array($children)) {
+          foreach($children as $child) {
+            if ($child['pid'] == $pid_on_url) {
+              $bad_path = false;
+            }
           }
         }
       }
@@ -655,9 +657,9 @@ function si_exhibition_sidora_viewer($object){
   print "Ready to display using the sidora_viewer:".$viewer;
   $debug_result = ob_get_clean();
   si_exhibition_debug($debug_result);
-
-  $urlencodedpath = urlencode(implode($_SESSION['si_exhibition_latest_pid_path'],","));
-  $urlencodedpath_no_last = urlencode(implode(array_slice($_SESSION['si_exhibition_latest_pid_path'],0,sizeof($_SESSION['si_exhibition_latest_pid_path'])-1),","));
+  $pptsc = si_exhibition_get_pid_path_to_showing_concept();
+  $urlencodedpath = urlencode(implode($pptsc,","));
+  $urlencodedpath_no_last = urlencode(implode(array_slice($pptsc,0,sizeof($pptsc)-1),","));
   switch ($viewer) {
     case 'pdfjs':
       drupal_goto(variable_get('sidora_pdf_js_location','').'?file='.$base_url.'/fedora/repository/'.$pid.'/OBJ%3Fpath%3D'.$urlencodedpath_no_last);
@@ -670,10 +672,10 @@ function si_exhibition_sidora_viewer($object){
       sidora_tabular_view_phpexcelreader($pid,'OBJ');
       break;
     case 'JW Audio Player':
-      si_exhibition_jw_player($pid, 'PROXY_MP3/file_name_spoof.mp3?path='.$urlencodedpath_no_last);
+      si_exhibition_jw_player($pid, 'PROXY_MP3/file_name_spoof.mp3?path='.$urlencodedpath_no_last, $urlencodedpath_no_last);
       break;
     case 'JW Video Player':
-      si_exhibition_jw_player($pid, 'MP4/file_name_spoof.mp4?path='.$urlencodedpath_no_last);
+      si_exhibition_jw_player($pid, 'MP4/file_name_spoof.mp4?path='.$urlencodedpath_no_last, $urlencodedpath_no_last);
       break;
     case 'browser_degraded':
       $debug_result = ob_get_clean();
@@ -688,7 +690,7 @@ function si_exhibition_sidora_viewer($object){
   }
   exit();
 }
-function si_exhibition_jw_player($pid, $file_path){
+function si_exhibition_jw_player($pid, $file_path, $path_no_last){
   if (strpos($pid, ':') !== FALSE) $pid = urlencode($pid);
   global $base_url;
   print '
@@ -697,7 +699,7 @@ function si_exhibition_jw_player($pid, $file_path){
 document.addEventListener("DOMContentLoaded",function() {
   jwplayer("mediaplayer").setup({
     file: "'.$base_url.'/fedora/repository/'.$pid.'/'.$file_path.'",
-    image: "'.$base_url.'/fedora/repository/'.$pid.'/TN/tn.jpg?path='.$file_path.'",
+    image: "'.$base_url.'/fedora/repository/'.$pid.'/TN/tn.jpg?path='.$path_no_last.'",
     width: "480",
     height: "270",
     logo : { hide: "true" }
