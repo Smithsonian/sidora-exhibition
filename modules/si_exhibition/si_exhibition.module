@@ -272,7 +272,6 @@ function si_exhibition_block_view($delta='') {
           'subject' => t('SI Navigation'),
           'content' => theme('si_exhibition_navigation', array('pid'=>$pid)),
         );
-        dsm("seu_nav");
         break;
       case "seu_parent":
         $block = array(
@@ -657,9 +656,11 @@ function si_exhibition_sidora_viewer($object){
   $debug_result = ob_get_clean();
   si_exhibition_debug($debug_result);
 
+  $urlencodedpath = urlencode(implode($_SESSION['si_exhibition_latest_pid_path'],","));
+  $urlencodedpath_no_last = urlencode(implode(array_slice($_SESSION['si_exhibition_latest_pid_path'],0,sizeof($_SESSION['si_exhibition_latest_pid_path'])-1),","));
   switch ($viewer) {
     case 'pdfjs':
-      drupal_goto(variable_get('sidora_pdf_js_location','').'?file='.$base_url.'/fedora/repository/'.$pid.'/OBJ');
+      drupal_goto(variable_get('sidora_pdf_js_location','').'?file='.$base_url.'/fedora/repository/'.$pid.'/OBJ%3Fpath%3D'.$urlencodedpath_no_last);
       drupal_exit();
       break;
     case 'OpenSeaDragon':
@@ -669,10 +670,10 @@ function si_exhibition_sidora_viewer($object){
       sidora_tabular_view_phpexcelreader($pid,'OBJ');
       break;
     case 'JW Audio Player':
-      si_exhibition_jw_player($pid, 'PROXY_MP3/file_name_spoof.mp3?path='.urlencode(implode($_SESSION['si_exhibition_latest_pid_path'],",")));
+      si_exhibition_jw_player($pid, 'PROXY_MP3/file_name_spoof.mp3?path='.$urlencodedpath_no_last);
       break;
     case 'JW Video Player':
-      si_exhibition_jw_player($pid, 'MP4/file_name_spoof.mp4?path='.urlencode(implode($_SESSION['si_exhibition_latest_pid_path'],",")));
+      si_exhibition_jw_player($pid, 'MP4/file_name_spoof.mp4?path='.$urlencodedpath_no_last);
       break;
     case 'browser_degraded':
       $debug_result = ob_get_clean();
@@ -696,7 +697,7 @@ function si_exhibition_jw_player($pid, $file_path){
 document.addEventListener("DOMContentLoaded",function() {
   jwplayer("mediaplayer").setup({
     file: "'.$base_url.'/fedora/repository/'.$pid.'/'.$file_path.'",
-    image: "'.$base_url.'/fedora/repository/'.$pid.'/TN/tn.jpg",
+    image: "'.$base_url.'/fedora/repository/'.$pid.'/TN/tn.jpg?path='.$file_path.'",
     width: "480",
     height: "270",
     logo : { hide: "true" }
@@ -731,10 +732,10 @@ $url_to_get .= implode('/' , array_map('urlencode',$callback_args));
   $ch = curl_init();
   $timeout = 60;
   if (strpos($url_to_get, '?') === FALSE) {
-    curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+    curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'?time='.time());
   }
   else {
-    curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+    curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'&time='.time());
   }
   //curl_setopt($ch, CURLOPT_URL, $url_to_get);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -836,10 +837,10 @@ function si_exhibition_meta_string_for_xslt_by_id($pid){
     $ch = curl_init();
     $timeout = 60;
     if (strpos($url_to_get, '?') === FALSE) {
-      curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+      curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'?time='.time());
     }
     else {
-      curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+      curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'&time='.time());
     }
     //curl_setopt($ch, CURLOPT_URL, $url_to_get);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -939,10 +940,10 @@ function si_exhibition_xsl_string($pid){
     $ch = curl_init();
     $timeout = 60;
     if (strpos($url_to_get, '?') === FALSE) {
-      curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+      curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'?time='.time());
     }
     else {
-      curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+      curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'&time='.time());
     }
     //curl_setopt($ch, CURLOPT_URL, $url_to_get);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -2070,6 +2071,9 @@ function si_exhibition_sidora_debug($debug_string, $cgi = NULL) {
  * Will return NULL on errors and may set drupal error messages during the error processing
  */
 function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_messages = TRUE){
+  if (empty($pid)) {
+    return NULL;
+  }
   si_exhibition_debug("Looking for item_display_config for pid:$pid",NULL,TRUE);
   
   $path = filter_input(INPUT_GET, 'path');
@@ -2103,10 +2107,10 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
   $ch = curl_init();
   $timeout = 60;
   if (strpos($url_to_get, '?') === FALSE) {
-    curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+    curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'?time='.time());
   }
   else {
-    curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+    curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'&time='.time());
   }
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
   curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
@@ -2145,7 +2149,7 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
     //No longer give download message, instead fully hide the data.  drupal_not_found() produces infinite loop
     watchdog('exhibition','Exhibition Config indicated this is not a good item to get:'.$url_to_get);
 
-    watchdog('exhibition',"Coming from:".exhibition_debug_string_backtrace());
+    // watchdog('exhibition',"Coming from:".exhibition_debug_string_backtrace());
     drupal_exit();
   }
   if (isset($se['nav_type']) && $se['nav_type'] == 'tree'){
@@ -2270,10 +2274,10 @@ function si_exhibition_get_visibility_tree($pid = NULL) {
   $ch = curl_init();
   $timeout = 60;
   if (strpos($url_to_get, '?') === FALSE) {
-    curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+    curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'?time='.time());
   }
   else {
-    curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+    curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'&time='.time());
   }
   //curl_setopt($ch, CURLOPT_URL, $url_to_get);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
@@ -2414,13 +2418,11 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array(), $pat
       //$get_pid_tree_request[$req_key] = $to_return; //request level cache
       return $to_return;
     }else{
-      dsm('doesnt exist:'.$pid);
       $to_return = null;
       //$get_pid_tree_request[$req_key] = $to_return; //request level cache
       return $to_return;
     }
   }catch(Exception $hce){
-    dsm('exception trying to get:'.$pid);
     $to_return = null;
     //$get_pid_tree_request[$req_key] = $to_return; //request level cache
     return $to_return;
@@ -2430,12 +2432,16 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array(), $pat
  * hook_cron() to be run with the cron jobs, check fedora to see if there's new information to cache
  */
 function si_exhibition_cron(){
+ 
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $cron_check = si_exhibition_cron_cache(); 
   cache_clear_all('si_exhibition_cache_', 'cache', TRUE);  //Clear the main cache
   if (empty($cron_check)){
     return;
   }
+  // To enhance speed do not refresh the caches
+  return TRUE;
+  /*
   foreach($cron_check as $fn_name => $fn_args_arrays){
     drupal_set_message("si_exhibition reestablishing caches for:".$fn_name);
     foreach($fn_args_arrays as $fn_args){
@@ -2448,6 +2454,7 @@ function si_exhibition_cron(){
       }
     }
   }
+  */
 }
 /*
  * Return the form that will change the table presented in the middle of the exhibition screen in the browser
@@ -2533,10 +2540,10 @@ function si_exhibition_get_obj_datastream_content($pid) {
     $ch = curl_init();
     $timeout = 60;
     if (strpos($url_to_get, '?') === FALSE) {
-      curl_setopt($ch, CURLOPT_URL, $url_to_get.'?time='.time());
+      curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'?time='.time());
     }
     else {
-      curl_setopt($ch, CURLOPT_URL, $url_to_get.'&time='.time());
+      curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'&time='.time());
     }
     //curl_setopt($ch, CURLOPT_URL, $url_to_get);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);

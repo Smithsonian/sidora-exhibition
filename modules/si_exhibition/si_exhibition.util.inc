@@ -399,6 +399,7 @@ function si_exhibition_get_pid_path_to_showing_concept($url = NULL) {
     $_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
     return $pid_path;
   }
+  /*
   if (!empty($_SESSION['si_exhibition_latest_pid_path'])){
     si_exhibition_debug('returning pid path based on the existing session:' . json_encode($_SESSION['si_exhibition_latest_pid_path']), NULL, TRUE);
     return $_SESSION['si_exhibition_latest_pid_path'];
@@ -412,7 +413,10 @@ function si_exhibition_get_pid_path_to_showing_concept($url = NULL) {
   $_SERVER['REQUEST_URI'].
   '$url'.
   $url, empty($_SESSION)?array():$_SESSION, TRUE);
-  return array();
+  /*
+  */
+  $pid_path = array(arg(2));
+  return $pid_path;
 }
 /*
  * Return whether a string has the possibility of being a pid
@@ -435,7 +439,9 @@ function si_exhibition_get_pid_path_to_concept_by_url($url) {
     $fr_location = strpos($request_path,'/fedora/repository/');
     if ($fr_location !== FALSE) {
       $final_pid = urldecode(substr($request_path,$fr_location+19));
-      $final_pid = substr($final_pid,0,strpos($final_pid,'/'));
+      if (strpos($final_pid,'/') > 0) {
+        $final_pid = substr($final_pid,0,strpos($final_pid,'/'));
+      }
       if (si_exhibition_check_valid_pid($final_pid)) {
         if (!empty($url_info['query'])) {
           parse_str($url_info['query'],$query_holder);
@@ -477,7 +483,6 @@ function si_exhibition_get_child_resource_info(FedoraObject $object, $type = 'al
   return si_exhibition_get_child_resource_info_by_id($object->id, $type, $sort);
 }
 function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', $sort = 'asc') {
-
   //Start cache check for return
   $cache_name = 'child_resource_info';
   $cache_index = $object_id.'_'.$type.'_'.$sort;
