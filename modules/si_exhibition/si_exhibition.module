@@ -507,7 +507,8 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
 
     require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
     $vis_obj = si_exhibition_get_visibility_object($pid);
-    if (empty($vis_obj) || empty($vis_obj['show_preview'])) {
+
+		if (empty($vis_obj) || empty($vis_obj['show_preview'])) {
       si_exhibition_debug('Visibility object empty or show_preview was empty');
       if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
       //  print $pid;
@@ -2760,4 +2761,154 @@ function si_exhibition_get_degradation_level($pid_to_check) {
     return $se['image_degradation'];
   }
   return '2';
-} 	 
+} 
+/*
+function si_exhibition_get_visibility_tree_optimum($pid = NULL,$path_to_pid = NULL) {
+  if ($pid === NULL) {
+    $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+    if (!empty($parent_pid_path)){
+      $pid = $parent_pid_path[0];
+    }
+  }
+	if ($path_to_pid == NULL) {
+	  $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+    if (!empty($parent_pid_path)){
+		  $path_to_pid = implode('_',$parent_pid_path);
+		}
+	}	
+	if ($path_to_pid == '')	$path_to_pid = $pid; 	
+  $url_to_get = 'https://workbench.sidora.si.edu/exhibition_config/json_visibility_new/' . urlencode($path_to_pid);
+  if (array_key_exists($url_to_get, $GLOBALS)) {
+    return $GLOBALS[$url_to_get];
+  }
+  $ch = curl_init();
+  $timeout = 60;
+  if (strpos($url_to_get, '?') === FALSE) {
+    curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'?time='.time());
+  }
+  else {
+    curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'&time='.time());
+  }
+  //curl_setopt($ch, CURLOPT_URL, $url_to_get);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+  $data = curl_exec($ch);
+  if ($data === FALSE){
+    /*
+    ob_start();
+    print "Error on visibility tree call\n";
+    var_dump($ch);
+    var_dump($curl_errori($ch));
+    var_dump(curl_getinfo($ch));
+    $debug_result = ob_get_clean();
+    si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+    */
+
+    $curl_error_string = curl_error($ch);
+   // print_t('Could not obtain data from:'.$url_to_get);
+    print $curl_error_string.'<br/>'."\n";
+    $info = curl_getinfo($ch);
+    print_r($info);
+    curl_close($ch);
+    $GLOBALS[$url_to_get] = NULL;
+    return $GLOBALS[$url_to_get];
+  }
+  ob_start();
+  print "Success on visibility tree call\n";
+  var_dump($ch);
+  var_dump(curl_error($ch));
+  var_dump(curl_getinfo($ch));
+  var_dump($data);
+  $debug_result = ob_get_clean();
+  si_exhibition_debug($debug_result, curl_getinfo($ch));
+
+  curl_close($ch);
+ 
+  
+  $GLOBALS[$url_to_get] = json_decode($data, TRUE);
+  ob_start();
+  print "Returning visibility object\n";
+  var_dump ($GLOBALS[$url_to_get]);
+  $debug_result = ob_get_clean();
+  si_exhibition_debug($debug_result);
+
+  return $GLOBALS[$url_to_get];
+}
+function si_exhibition_get_visibility_tree_children($pid = NULL,$path_to_pid = NULL) {
+  if ($pid === NULL) {
+    $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+    if (!empty($parent_pid_path)){
+      $pid = array_pop($parent_pid_path);
+    }
+  }
+	if ($path_to_pid == NULL) {
+	  $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+    if (!empty($parent_pid_path)){
+		  $path_to_pid = implode('_',$parent_pid_path);
+		}
+	}	
+	if ($path_to_pid == '')	$path_to_pid = $pid; 	
+  $url_to_get = 'https://workbench.sidora.si.edu/exhibition_config/json_visibility_children/' . urlencode($path_to_pid);
+  if (array_key_exists($url_to_get, $GLOBALS)) {
+    return $GLOBALS[$url_to_get];
+  }
+  $ch = curl_init();
+  $timeout = 60;
+  if (strpos($url_to_get, '?') === FALSE) {
+    curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'?time='.time());
+  }
+  else {
+    curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'&time='.time());
+  }
+  //curl_setopt($ch, CURLOPT_URL, $url_to_get);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+  $data = curl_exec($ch);
+  if ($data === FALSE){
+    /*
+    ob_start();
+    print "Error on visibility tree call\n";
+    var_dump($ch);
+    var_dump($curl_errori($ch));
+    var_dump(curl_getinfo($ch));
+    $debug_result = ob_get_clean();
+    si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
+    */
+
+    $curl_error_string = curl_error($ch);
+   // print_t('Could not obtain data from:'.$url_to_get);
+    print $curl_error_string.'<br/>'."\n";
+    $info = curl_getinfo($ch);
+    print_r($info);
+    curl_close($ch);
+    $GLOBALS[$url_to_get] = NULL;
+    return $GLOBALS[$url_to_get];
+  }
+  ob_start();
+  print "Success on visibility tree call\n";
+  var_dump($ch);
+  var_dump(curl_error($ch));
+  var_dump(curl_getinfo($ch));
+  var_dump($data);
+  $debug_result = ob_get_clean();
+  si_exhibition_debug($debug_result, curl_getinfo($ch));
+
+  curl_close($ch);
+ 
+  
+  $GLOBALS[$url_to_get] = json_decode($data, TRUE);
+  ob_start();
+  print "Returning visibility object\n";
+  var_dump ($GLOBALS[$url_to_get]);
+  $debug_result = ob_get_clean();
+  si_exhibition_debug($debug_result);
+
+  return $GLOBALS[$url_to_get];
+}
+*/

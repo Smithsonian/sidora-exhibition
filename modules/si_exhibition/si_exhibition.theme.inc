@@ -273,7 +273,7 @@ function theme_si_exhibition_parent_concepts($vars) {
   global $main_path;
   $full_path = (isset($_GET['path']) ? $_GET['path'] : '');
   $main_path = $full_path;
-  if (!empty($main_path)) {
+	if (!empty($main_path)) {
     $lastComma = strrpos($main_path, ",");
     if ($lastComma === false) {
       $main_path = '';
@@ -290,6 +290,7 @@ function theme_si_exhibition_parent_concepts($vars) {
     foreach($curr_tree_loc['children'] as $ctl_child) {
       if ($ctl_child['pid'] == $piece) {
         $curr_tree_loc = $ctl_child;
+				break;
       }
     }
   }
@@ -309,7 +310,43 @@ function theme_si_exhibition_parent_concepts($vars) {
   );
   return $header . (empty($links) ? t('This item is the root of the exhibition.') : theme('item_list', $item_list_array));
 }
+/*function theme_si_exhibition_parent_concepts_optimum($vars) {
+  $pid = $vars['pid'];
+  global $main_path;
+  $full_path = (isset($_GET['path']) ? $_GET['path'] : '');
+  $main_path = $full_path;
+  if (!empty($main_path)) {
+    $pid_path_array = explode(',',$main_path);
+		$last_parent = array_pop($pid_path_array);
+		$pid_path_array[] = $last_parent;
+		$path_to_last_parent = implode('_',$pid_path_array)
+    $full_tree = si_exhibition_get_visibility_tree_optimum($last_parent,$path_to_last_parent); 
+    $curr_tree_loc = $full_tree;
+    if (empty($curr_tree_loc)) return '';
+    $lastComma = strrpos($main_path, ",");
+    if ($lastComma === false) {
+      $main_path = '';
+    } else {
+      $main_path = substr($main_path, 0, $lastComma);
+    }
+	}
+  $header = '<h3>' . t('Parent concept') . '</h3>';
+  $links = array();
+  if (!empty($full_path)) {
+    $link = l($curr_tree_loc['label'], "fedora/repository/{$curr_tree_loc['pid']}", array('query' => array('path'=>$main_path)));
+    $links = array($link);
+  }
 
+  
+  $item_list_array = array(
+    'items'=>$links,
+    'title'=>NULL,
+    'type'=>'ul',
+    'attributes'=>array('class' => 'parent-concepts'),
+  );
+  return $header . (empty($links) ? t('This item is the root of the exhibition.') : theme('item_list', $item_list_array));
+}
+*/
 /**
  * Implements theme_hook().
  *
@@ -346,6 +383,37 @@ function theme_si_exhibition_child_concepts($vars){
   return $header . (empty($links) ? t('This item has no child concepts.') : theme('item_list', $item_list_array));
 }
 /*
+function theme_si_exhibition_child_concepts_optimum($vars){
+  $pid = $vars['pid'];
+  global $main_path;
+  $header ='<h3>' . t('Child concepts') . '</h3>';
+  $main_path = (isset($_GET['path']) ? $_GET['path'] : '');
+  if (empty($main_path)){
+    $main_path = $pid;
+  }else{
+    $main_path .= ','.$pid;
+  }
+  $make_link = function($child) {
+    global $main_path;
+    if (strtolower($child['type']) == 'resource') return NULL;
+    return l($child['label'], "fedora/repository/{$child['pid']}", array('query' => array('path'=>$main_path)));
+  };
+  $vo = si_exhibition_get_visibility_object_children($pid);
+  if (empty($vo)) return '';
+  if (empty($vo['children'])) {
+    $vo['children'] = array();
+  }
+  $links = array_filter(array_map($make_link, $vo['children']));
+  
+  $item_list_array = array(
+    'items'=>$links, 
+    'title'=>NULL, 
+    'type'=>'ul', 
+    'attributes'=>array('class' => 'child-concepts'),
+  );
+  return $header . (empty($links) ? t('This item has no child concepts.') : theme('item_list', $item_list_array));
+}*/
+/*
  * Error handler to eat the annoying XmlErrors that are not exceptions
  * Returning false in function HandleXmlError() causes a fallback to the default error handler.
  * Originally from: http://php.net/manual/en/domdocument.loadxml.php
@@ -377,8 +445,8 @@ function theme_si_exhibition_metadata_xmls($vars){
       return;
     }
   }
-  $vis_obj = si_exhibition_get_visibility_object($pid);
-  if (empty($vis_obj) || empty($vis_obj['show_meta'])) {
+  $vis_obj = si_exhibition_get_visibility_object_optimum($pid);
+	if (empty($vis_obj) || empty($vis_obj['show_meta'])) {
     //The page may be showing the metadata on a portion of the page and not a page of only metadata
     //If that is the case, just return without indication that metadata is not shown.
     si_exhibition_debug('empty visibility object or show_meta empty:'.$pid);

@@ -61,6 +61,57 @@ function si_exhibition_check_visibility($to_check_pid, $parent_pid_path = NULL) 
  * different visibility settings on their children between each occurrance.
  *
  */
+/*
+function si_exhibition_get_visibility_object_optimum($to_check_pid, $parent_pid_path = NULL) {
+  if ($parent_pid_path === NULL) {
+    // Find where the path of the current concept from the exhibition root
+    $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+  }
+  // Go to that place in the visibility tree
+  // Return if the child pid is there
+  if (!empty($parent_pid_path)){
+		  $path_to_pid = implode('_',$parent_pid_path);
+	$vis_tree = si_exhibition_get_visibility_tree_optimum($to_check_pid,$path_to_pid);
+    $curr_children = array($vis_tree);
+		return $vis_tree;
+  }
+  else {
+    //The parent path is empty, so we are looking for the root pid to match the checking_pid
+    $vis_tree = si_exhibition_get_visibility_tree($to_check_pid);
+    if (!empty($vis_tree) && !empty($vis_tree['pid'])){
+      if ($vis_tree['pid'] == $to_check_pid) {
+        return $vis_tree;
+      }
+    }
+  }
+  return FALSE;
+}
+
+function si_exhibition_get_visibility_object_children($to_check_pid, $parent_pid_path = NULL) {
+  if ($parent_pid_path === NULL) {
+    // Find where the path of the current concept from the exhibition root
+    $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+  }
+  // Go to that place in the visibility tree
+  // Return if the child pid is there
+  if (!empty($parent_pid_path)){
+		  $path_to_pid = implode('_',$parent_pid_path);
+	$vis_tree = si_exhibition_get_visibility_tree_children($to_check_pid,$path_to_pid);
+    $curr_children = array($vis_tree);
+		return $vis_tree;
+  }
+  else {
+    //The parent path is empty, so we are looking for the root pid to match the checking_pid
+    $vis_tree = si_exhibition_get_visibility_tree($to_check_pid);
+    if (!empty($vis_tree) && !empty($vis_tree['pid'])){
+      if ($vis_tree['pid'] == $to_check_pid) {
+        return $vis_tree;
+      }
+    }
+  }
+  return FALSE;
+}
+
 function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = NULL) {
   if ($parent_pid_path === NULL) {
     // Find where the path of the current concept from the exhibition root
@@ -69,7 +120,7 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
   // Go to that place in the visibility tree
   // Return if the child pid is there
   if (!empty($parent_pid_path)){
-    $vis_tree = si_exhibition_get_visibility_tree($parent_pid_path[0]);
+		$vis_tree = si_exhibition_get_visibility_tree($parent_pid_path[0]);
     $curr_children = array($vis_tree);
     foreach($parent_pid_path as $curr_pid){
       $found_next_child = FALSE;
@@ -85,6 +136,7 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
             $next_children = array(); 
           }
           $curr_parent = $curr_child;
+					break;
         }
       }
       if ($found_next_child) {
@@ -125,7 +177,7 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
     }
   }
   return FALSE;
-}
+}*/
 /*
 * For exhibitions, hide parents that aren't supposed to be shown, only the parents that should be in the current exhibition path
 * Only used in the si_exhibition_get_parent_info function
@@ -390,7 +442,7 @@ function si_exhibition_get_pid_path_to_showing_concept($url = NULL) {
   $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['REQUEST_URI']);
   if (!empty($pid_path)) {
     si_exhibition_debug('setting session for pid path via server request_uri:' . $_SERVER['REQUEST_URI'], NULL, TRUE);
-    //$_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
+		//$_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
     return $pid_path;
   }
   $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['HTTP_REFERER']);
@@ -697,4 +749,3 @@ function si_exhibition_get_datastream_contents(FedoraObject $object, $dsid) {
   }
   return '';
 }
-
