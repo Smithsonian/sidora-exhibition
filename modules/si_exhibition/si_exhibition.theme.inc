@@ -175,7 +175,8 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     if (!empty($available_view)){ $display['view'] = $available_view;  }
     $preview = '';
     if (array_search($display['view'], $resource['datastreams']) !== FALSE) {
-	$thumbnail_url = url("fedora/repository/{$resource['pid']}/TN/tn.jpg")."?path=".implode(',',si_exhibition_get_pid_path_to_showing_concept());
+	//$thumbnail_url = url("fedora/repository/{$resource['pid']}/TN/tn.jpg")."?path=".implode(',',si_exhibition_get_pid_path_to_showing_concept());
+	$thumbnail_url = url("si/exhibition/tn/{$resource['pid']}/TN/tn.jpg")."?path=".implode(',',si_exhibition_get_pid_path_to_showing_concept());
       if (array_search('si:datasetCModel', $resource['models']) !== FALSE) {
         $thumbnail_url = $GLOBALS['base_url'].'/'.drupal_get_path('module','si_exhibition').'/images/icons/x-office-spreadsheet.png';
       }	
@@ -257,8 +258,8 @@ function theme_si_exhibition_navigation($vars){
   }
   $output = '<div id="si-navigation"><div id="si-navigation-inner">';
   $output .= (variable_get('si_exhibition_expose_block', 'no') == 'no' ? '<h2>' . t('Navigation') . '</h2>' : '');
-  $output .= theme('si_exhibition_parent_concepts', array('pid'=>$pid));
-  $output .= theme('si_exhibition_child_concepts',  array('pid'=>$pid));
+  $output .= theme('si_exhibition_parent_concepts_optimum', array('pid'=>$pid));
+  $output .= theme('si_exhibition_child_concepts_optimum',  array('pid'=>$pid));
   $output .= '</div></div>';
   return $output;
 }
@@ -310,7 +311,9 @@ function theme_si_exhibition_parent_concepts($vars) {
   );
   return $header . (empty($links) ? t('This item is the root of the exhibition.') : theme('item_list', $item_list_array));
 }
-/*function theme_si_exhibition_parent_concepts_optimum($vars) {
+
+function theme_si_exhibition_parent_concepts_optimum($vars) {
+  watchdog("exhibition",'theme_si_exhibition_parent_concepts_optimum, pid:'.$vars['pid']);
   $pid = $vars['pid'];
   global $main_path;
   $full_path = (isset($_GET['path']) ? $_GET['path'] : '');
@@ -318,8 +321,8 @@ function theme_si_exhibition_parent_concepts($vars) {
   if (!empty($main_path)) {
     $pid_path_array = explode(',',$main_path);
 		$last_parent = array_pop($pid_path_array);
-		$pid_path_array[] = $last_parent;
-		$path_to_last_parent = implode('_',$pid_path_array)
+		array_push($pid_path_array,$last_parent);
+		$path_to_last_parent = implode('_',$pid_path_array);
     $full_tree = si_exhibition_get_visibility_tree_optimum($last_parent,$path_to_last_parent); 
     $curr_tree_loc = $full_tree;
     if (empty($curr_tree_loc)) return '';
@@ -346,7 +349,7 @@ function theme_si_exhibition_parent_concepts($vars) {
   );
   return $header . (empty($links) ? t('This item is the root of the exhibition.') : theme('item_list', $item_list_array));
 }
-*/
+
 /**
  * Implements theme_hook().
  *
@@ -382,8 +385,9 @@ function theme_si_exhibition_child_concepts($vars){
   );
   return $header . (empty($links) ? t('This item has no child concepts.') : theme('item_list', $item_list_array));
 }
-/*
+
 function theme_si_exhibition_child_concepts_optimum($vars){
+  watchdog("exhibition",'theme_si_exhibition_child_concepts_optimum, pid:'.$vars['pid']);
   $pid = $vars['pid'];
   global $main_path;
   $header ='<h3>' . t('Child concepts') . '</h3>';
@@ -412,7 +416,7 @@ function theme_si_exhibition_child_concepts_optimum($vars){
     'attributes'=>array('class' => 'child-concepts'),
   );
   return $header . (empty($links) ? t('This item has no child concepts.') : theme('item_list', $item_list_array));
-}*/
+}
 /*
  * Error handler to eat the annoying XmlErrors that are not exceptions
  * Returning false in function HandleXmlError() causes a fallback to the default error handler.
@@ -437,6 +441,7 @@ function HandleXmlError($errno, $errstr, $errfile, $errline)
  */
 function theme_si_exhibition_metadata_xmls($vars){
   $pid = $vars['pid'];
+  watchdog("exhibition",'in theme metadata, pid:'.$pid);
   if (variable_get('si_exhibition_anonymous_only', FALSE)){
     if (!si_exhibition_check_view_permission($pid)){
       si_exhibition_debug('view_permission was false');
@@ -445,7 +450,9 @@ function theme_si_exhibition_metadata_xmls($vars){
       return;
     }
   }
-  $vis_obj = si_exhibition_get_visibility_object_optimum($pid);
+  $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+  array_push($parent_pid_path, $pid);
+  $vis_obj = si_exhibition_get_visibility_object_optimum($pid, $parent_pid_path);
 	if (empty($vis_obj) || empty($vis_obj['show_meta'])) {
     //The page may be showing the metadata on a portion of the page and not a page of only metadata
     //If that is the case, just return without indication that metadata is not shown.
@@ -516,7 +523,8 @@ function theme_si_exhibition_metadata_xmls($vars){
       $properOutput .= '<tr class="odd">'.$tableRows[$trNum];
     }
   }
-  return $properOutput; 
+
+	return $properOutput; 
 }
 /**
  * Implements theme_hook().

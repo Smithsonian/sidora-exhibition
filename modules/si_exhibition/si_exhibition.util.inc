@@ -53,6 +53,15 @@ function si_exhibition_check_visibility($to_check_pid, $parent_pid_path = NULL) 
   si_exhibition_debug('check_visibility', $debug_info);
   return ($vis_obj !== FALSE);
 }
+function si_exhibition_check_visibility_optimum($to_check_pid, $parent_pid_path = NULL) {
+  $vis_obj = si_exhibition_get_visibility_object_optimum($to_check_pid, $parent_pid_path);
+  $debug_info = array();
+  $debug_info['tcp'] = $to_check_pid;
+  $debug_info['ppp'] = $parent_pid_path;
+  $debug_info['vo'] = $vis_obj;
+  si_exhibition_debug('check_visibility', $debug_info);
+  return ($vis_obj !== FALSE);
+}
 /**
  * $parent_pid_path - String array of pids
  *                  - the path from the root of the exhibition to the direct parent of the pid to check
@@ -61,23 +70,24 @@ function si_exhibition_check_visibility($to_check_pid, $parent_pid_path = NULL) 
  * different visibility settings on their children between each occurrance.
  *
  */
-/*
+
 function si_exhibition_get_visibility_object_optimum($to_check_pid, $parent_pid_path = NULL) {
   if ($parent_pid_path === NULL) {
     // Find where the path of the current concept from the exhibition root
     $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
   }
+	watchdog("exhibition",'si_exhibition_get_visibility_object_optimum, getting visibility for :'.$to_check_pid);
   // Go to that place in the visibility tree
   // Return if the child pid is there
   if (!empty($parent_pid_path)){
-		  $path_to_pid = implode('_',$parent_pid_path);
+			$path_to_pid = implode('_',$parent_pid_path) . '_' . $to_check_pid;
 	$vis_tree = si_exhibition_get_visibility_tree_optimum($to_check_pid,$path_to_pid);
-    $curr_children = array($vis_tree);
 		return $vis_tree;
   }
   else {
     //The parent path is empty, so we are looking for the root pid to match the checking_pid
-    $vis_tree = si_exhibition_get_visibility_tree($to_check_pid);
+    $parent_pid_path = $to_check_pid;
+		$vis_tree = si_exhibition_get_visibility_tree_optimum($to_check_pid,$parent_pid_path);
     if (!empty($vis_tree) && !empty($vis_tree['pid'])){
       if ($vis_tree['pid'] == $to_check_pid) {
         return $vis_tree;
@@ -96,6 +106,7 @@ function si_exhibition_get_visibility_object_children($to_check_pid, $parent_pid
   // Return if the child pid is there
   if (!empty($parent_pid_path)){
 		  $path_to_pid = implode('_',$parent_pid_path);
+  watchdog("exhibition",'si_exhibition_get_visibility_object_children: path to pid'.$path_to_pid);
 	$vis_tree = si_exhibition_get_visibility_tree_children($to_check_pid,$path_to_pid);
     $curr_children = array($vis_tree);
 		return $vis_tree;
@@ -119,6 +130,7 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
   }
   // Go to that place in the visibility tree
   // Return if the child pid is there
+  watchdog("exhibition",'si_exhibition_get_visibility_object, to check pid:'.$to_check_pid);
   if (!empty($parent_pid_path)){
 		$vis_tree = si_exhibition_get_visibility_tree($parent_pid_path[0]);
     $curr_children = array($vis_tree);
@@ -177,14 +189,15 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
     }
   }
   return FALSE;
-}*/
+}
 /*
 * For exhibitions, hide parents that aren't supposed to be shown, only the parents that should be in the current exhibition path
 * Only used in the si_exhibition_get_parent_info function
 */
 function si_exhibition_check_parent_in_tree(array $object_info, $tree_pid) {
   $tree_pid_list = array();
-  $tree = _si_exhibition_get_pid_tree($tree_pid, null, $tree_pid_list);
+  //$tree = _si_exhibition_get_pid_tree($tree_pid, null, $tree_pid_list);
+  $tree = _si_exhibition_get_pid_tree_optimum($tree_pid, null, $tree_pid_list, array($tree_pid));
   return in_array($object_info['pid'], $tree_pid_list);
 }
 
@@ -556,9 +569,10 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
   $resource_types = isset($resource_types[$type]) ? $resource_types[$type] : FALSE;
   $parent_path = si_exhibition_get_pid_path_to_showing_concept();
   array_pop($parent_path); //Remove the current concept from the "parents" list
-  $vis_obj = si_exhibition_get_visibility_object($object_id, $parent_path); //Get the visibility of the current concept
-
-  //Walk through the visibility pulling out the type and number of items asked for
+  //$vis_obj = si_exhibition_get_visibility_object($object_id, $parent_path); //Get the visibility of the current concept
+  $vis_obj = si_exhibition_get_visibility_object_children($object_id);
+  watchdog("exhibition",'si_exhibition_get_child_resource_info_by_id for :'.$object_id);
+	//Walk through the visibility pulling out the type and number of items asked for
   $count_so_far = 0;
   $resources = array();
   if (empty($vis_obj)){
@@ -630,7 +644,8 @@ function si_exhibition_fill_out_resources(&$resources, $show, $limit = NULL, $of
   if (empty($offset)) $offset = 0;
   $repo = tuque_wrapper_get_repository_instance();
   si_exhibition_debug('repo from si_exhibition_fill_out_resources');
-  foreach ($resources as $key => $resource) {
+  $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+	foreach ($resources as $key => $resource) {
      if ($key >= $offset && $key <= $offset+$limit){
       $object = $repo->getObject($resource['pid']); // We know it exists from the previous filter call.
       $resources[$key]['models'] = $object->models;
@@ -647,7 +662,9 @@ function si_exhibition_fill_out_resources(&$resources, $show, $limit = NULL, $of
           unset($resources[$key]);
         }
       }
-      $visibility_obj = si_exhibition_get_visibility_object($resource['pid']);
+      $path_to_pid = $parent_pid_path;
+			array_push($path_to_pid,$resource['pid']);
+			$visibility_obj = si_exhibition_get_visibility_object_optimum($resource['pid'],$path_to_pid);
       $resources[$key]['visibility'] = $visibility_obj;
     }
   }
