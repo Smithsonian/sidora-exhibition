@@ -320,9 +320,9 @@ function theme_si_exhibition_parent_concepts_optimum($vars) {
   $main_path = $full_path;
   if (!empty($main_path)) {
     $pid_path_array = explode(',',$main_path);
-		$last_parent = array_pop($pid_path_array);
-		array_push($pid_path_array,$last_parent);
-		$path_to_last_parent = implode('_',$pid_path_array);
+    $last_parent = array_pop($pid_path_array);
+    array_push($pid_path_array,$last_parent);
+    $path_to_last_parent = implode('_',$pid_path_array);
     $full_tree = si_exhibition_get_visibility_tree_optimum($last_parent,$path_to_last_parent); 
     $curr_tree_loc = $full_tree;
     if (empty($curr_tree_loc)) return '';
@@ -332,7 +332,7 @@ function theme_si_exhibition_parent_concepts_optimum($vars) {
     } else {
       $main_path = substr($main_path, 0, $lastComma);
     }
-	}
+  }
   $header = '<h3>' . t('Parent concept') . '</h3>';
   $links = array();
   if (!empty($full_path)) {
@@ -445,7 +445,7 @@ function theme_si_exhibition_metadata_xmls($vars){
   if (variable_get('si_exhibition_anonymous_only', FALSE)){
     if (!si_exhibition_check_view_permission($pid)){
       si_exhibition_debug('view_permission was false');
-      watchdog("exhibition","watchdog view_permission was false:".$pid);
+      watchdog("exhibition","in theme metadata, view_permission was false:".$pid);
       drupal_not_found();
       return;
     }
@@ -457,7 +457,7 @@ function theme_si_exhibition_metadata_xmls($vars){
     //The page may be showing the metadata on a portion of the page and not a page of only metadata
     //If that is the case, just return without indication that metadata is not shown.
     si_exhibition_debug('empty visibility object or show_meta empty:'.$pid);
-    watchdog("exhibition",'empty visibility object or show_meta empty:'.$pid);
+    watchdog("exhibition",'in theme metadata,empty visibility object or show_meta empty:'.$pid);
     return '';
   }
   $rows = si_models_get_display_xmls($pid);
