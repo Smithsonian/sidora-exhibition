@@ -198,8 +198,19 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
 */
 function si_exhibition_check_parent_in_tree(array $object_info, $tree_pid) {
   $tree_pid_list = array();
-  //$tree = _si_exhibition_get_pid_tree($tree_pid, null, $tree_pid_list);
-  $tree = _si_exhibition_get_pid_tree_optimum($tree_pid, null, $tree_pid_list, array($tree_pid));
+  $tree = '';
+	if (variable_get('si_exhibition_file_cache', FALSE)) $tree = _si_exhibition_get_pid_tree_from_cache($tree_pid);
+	if (empty($tree)) {
+	  $tree = _si_exhibition_get_pid_tree_optimum($tree_pid, null, $tree_pid_list, array($tree_pid));
+		if (variable_get('si_exhibition_file_cache', FALSE)) {
+		  $return_from_write = _si_exhibition_get_pid_tree_to_cache($tree_pid,$tree);
+      watchdog("exhibition",'_si_show_exhibition, writing to file cache :'.$return_from_write);
+		}	
+	}
+	else {
+	  _si_exhibition_get_pid_list_from_tree(array($tree),$tree_pid_list);
+	}	
+  //$tree = _si_exhibition_get_pid_tree_optimum($tree_pid, null, $tree_pid_list, array($tree_pid));
   return in_array($object_info['pid'], $tree_pid_list);
 }
 
