@@ -2956,7 +2956,7 @@ function si_exhibition_get_visibility_tree_children($pid = NULL,$path_to_pid = N
    if ($path_to_pid == '') $path_to_pid = $pid; 	
   $url_to_get = variable_get('si_exhibition_visibility_info_url', '');
   $url_to_get = si_exhibition_get_optimized_url($url_to_get,'json_visibility_children') . urlencode($path_to_pid);
-  watchdog("exhibition",'si_exhibition_get_visibility_tree_children: url to get'.$url_to_get);
+  //watchdog("exhibition",'si_exhibition_get_visibility_tree_children: url to get'.$url_to_get);
   if (array_key_exists($url_to_get, $GLOBALS)) {
     return $GLOBALS[$url_to_get];
   }
@@ -3031,7 +3031,7 @@ function si_exhibition_get_visibility_tree_optimum($pid = NULL,$path_to_pid = NU
   }	
   $url_to_get = variable_get('si_exhibition_visibility_info_url', '');
   $url_to_get = si_exhibition_get_optimized_url($url_to_get,'json_visibility_new') . urlencode($path_to_pid);
-  watchdog("exhibition",'si_exhibition_get_visibility_tree_optimum, url_to_get :'.$url_to_get);
+  //watchdog("exhibition",'si_exhibition_get_visibility_tree_optimum, url_to_get :'.$url_to_get);
   if (array_key_exists($url_to_get, $GLOBALS)) {
     return $GLOBALS[$url_to_get];
   }
