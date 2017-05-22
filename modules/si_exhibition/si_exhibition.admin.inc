@@ -74,6 +74,11 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#title' => t('Turn on debugging mode.'),
       '#default_value' => variable_get('si_exhibition_debug',FALSE),
     ),
+    'si_exhibition_file_cache' => array(
+      '#type' => 'checkbox',
+      '#title' => t('Turn on File Caching.'),
+      '#default_value' => variable_get('si_exhibition_file_cache',TRUE),
+    ),
     'fedora_base_url' => array(
       '#type' => 'textfield',
       '#title' => t('Where to obtain the Fedora Commons objects'),

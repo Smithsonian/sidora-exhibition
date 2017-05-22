@@ -101,7 +101,9 @@ function si_exhibition_menu() {
 
 function si_exhibition_clear_cache(){
 	cache_clear_all('si_exhibition_cache_','cache',TRUE);
- }
+	array_map('unlink', glob(drupal_realpath('public://') .'/pid_tree*.html'));
+	watchdog("exhibition",'clear_cache, cleared');
+}
  
  /**
  * Implements hook_theme().
@@ -364,7 +366,18 @@ function _si_show_exhibition(){
     if (!empty($path_list[0])){
       $path_to_pid = array($path_list[0]);
      //$tree = _si_exhibition_get_pid_tree($path_list[0], null, $tree_pid_list);
-      $tree = _si_exhibition_get_pid_tree_optimum($path_list[0], null, $tree_pid_list,$path_to_pid);
+      $tree = '';
+			if (variable_get('si_exhibition_file_cache', FALSE)) $tree = _si_exhibition_get_pid_tree_from_cache($path_list[0]);
+			if (empty($tree)) {
+			  $tree = _si_exhibition_get_pid_tree_optimum($path_list[0], null, $tree_pid_list,$path_to_pid);
+				if (variable_get('si_exhibition_file_cache', FALSE)) {
+				  $return_from_write = _si_exhibition_get_pid_tree_to_cache($path_list[0],$tree);
+          watchdog("exhibition",'_si_show_exhibition, writing to file cache :'.$return_from_write);
+				}	
+			}
+			else {
+			  _si_exhibition_get_pid_list_from_tree(array($tree),$tree_pid_list);
+			}	
 			if (!in_array($pid_on_url,$tree_pid_list)){
         $bad_path = true;
       }
@@ -2503,6 +2516,15 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array(), $pat
     return $to_return;
   }
 }
+function _si_exhibition_get_pid_tree_from_cache($pid) {
+ if (is_file(drupal_realpath('public://' . 'pid_tree_' . $pid . '.html'))) {
+   return json_decode(file_get_contents(drupal_realpath('public://' . 'pid_tree_' . $pid . '.html')), true); 
+ }
+ return;
+} 
+function _si_exhibition_get_pid_tree_to_cache($pid,$tree) {
+	return file_put_contents('public://' . 'pid_tree_' . $pid . '.html',json_encode($tree)); 
+ }
 function _si_exhibition_get_pid_tree_optimum($pid, $owner_id, &$pid_list = array(), $path_from_root_to_current_pid = array()){
   //Request level cache
   //$req_key = $pid.'_'.$owner_id.'_'.implode(':',$pid_list);
@@ -3050,4 +3072,14 @@ function si_exhibition_get_optimized_url($url_to_process = NULL, $optimized_call
     return $url_to_process;
   }	
 }
+function _si_exhibition_get_pid_list_from_tree($branch,&$tree_pid_list) {
+  if (isset($branch) && sizeof($branch) && !empty($branch)) {
+    foreach ($branch as $child_array) {
+		  array_push($tree_pid_list,$child_array['pid']);
+      if ((isset($child_array['children'])) && (sizeof($child_array['children']) > 0)) {
+				_si_exhibition_get_pid_list_from_tree($child_array['children'],$tree_pid_list);
+      }
+    }
+	}
+} 
 
