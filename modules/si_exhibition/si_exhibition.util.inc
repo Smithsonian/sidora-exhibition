@@ -80,7 +80,7 @@ function si_exhibition_get_visibility_object_optimum($to_check_pid, $parent_pid_
   // Go to that place in the visibility tree
   // Return if the child pid is there
   if (!empty($to_check_pid)) {
-	if (!empty($parent_pid_path)){
+   if (!empty($parent_pid_path)){
     $path_to_pid = implode('_',$parent_pid_path) . '_' . $to_check_pid;
     $vis_tree = si_exhibition_get_visibility_tree_optimum($to_check_pid,$path_to_pid);
     return $vis_tree;
@@ -96,13 +96,14 @@ function si_exhibition_get_visibility_object_optimum($to_check_pid, $parent_pid_
     }
   }
   }
-	return FALSE;
+  return FALSE;
 }
 
 function si_exhibition_get_visibility_object_children($to_check_pid, $parent_pid_path = NULL) {
   if ($parent_pid_path === NULL) {
     // Find where the path of the current concept from the exhibition root
     $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+    //watchdog("exhibition",'si_exhibition_get_visibility_object_children: path to pid'.implode(',', $parent_pid_path) . ' for pid : ' . $to_check_pid);
   }
   // Go to that place in the visibility tree
   // Return if the child pid is there
@@ -199,17 +200,17 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
 function si_exhibition_check_parent_in_tree(array $object_info, $tree_pid) {
   $tree_pid_list = array();
   $tree = '';
-	if (variable_get('si_exhibition_file_cache', FALSE)) $tree = _si_exhibition_get_pid_tree_from_cache($tree_pid);
-	if (empty($tree)) {
-	  $tree = _si_exhibition_get_pid_tree_optimum($tree_pid, null, $tree_pid_list, array($tree_pid));
-		if (variable_get('si_exhibition_file_cache', FALSE)) {
-		  $return_from_write = _si_exhibition_get_pid_tree_to_cache($tree_pid,$tree);
-      watchdog("exhibition",'_si_show_exhibition, writing to file cache :'.$return_from_write);
-		}	
-	}
-	else {
-	  _si_exhibition_get_pid_list_from_tree(array($tree),$tree_pid_list);
-	}	
+  if (variable_get('si_exhibition_file_cache', FALSE)) $tree = _si_exhibition_get_pid_tree_from_cache($tree_pid);
+    if (empty($tree)) {
+     $tree = _si_exhibition_get_pid_tree_optimum($tree_pid, null, $tree_pid_list, array($tree_pid));
+     if (variable_get('si_exhibition_file_cache', FALSE)) {
+       $return_from_write = _si_exhibition_get_pid_tree_to_cache($tree_pid,$tree);
+      watchdog("exhibition",'si_exhibition_check_parent_in_tree, writing to file cache :'.$return_from_write);
+      }	
+     }
+     else {
+      _si_exhibition_get_pid_list_from_tree(array($tree),$tree_pid_list);
+     }	
   //$tree = _si_exhibition_get_pid_tree_optimum($tree_pid, null, $tree_pid_list, array($tree_pid));
   return in_array($object_info['pid'], $tree_pid_list);
 }
@@ -380,8 +381,9 @@ function si_exhibition_debug($message, $object = NULL, $also_watchdog = FALSE){
  * Saves data in the cache if "overwrite" parameter has a value
  * If permanent set to true, will not expire
  */
+ $si_exhibition_quick_cache = array();
 function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE, $permanent = FALSE){
-  global $tnum;
+  global $si_exhibition_quick_cache;
   si_exhibition_debug("si_exhibition_cache <pre>" . json_encode($cache_name) . " | " . json_encode($cache_data_index) . " | " . json_encode($overwrite) . " | " . json_encode($permanent) ." |</pre>");
   if (!variable_get('si_exhibition_cache_on',TRUE)){
     si_exhibition_debug("si_exhibition_cache is turned off");
@@ -391,6 +393,9 @@ function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE,
   $prefix = 'si_exhibition_cache_';
   $cache_table_for_clearing = 'cache';
   if ($overwrite === FALSE){
+    if (!empty($si_exhibition_quick_cache[$prefix.$cache_name.$cache_data_index])){
+      return $si_exhibition_quick_cache[$prefix.$cache_name.$cache_data_index];
+    }
     $cache = NULL;
     if ($cache_info = cache_get($prefix.$cache_name, $cache_table_for_clearing)){
       $cache = $cache_info->data;
@@ -410,14 +415,14 @@ function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE,
       $data = $cache_info->data;
     }
     $data[$cache_data_index] = $overwrite;
-    $hours = 3;
+    $hours = 12;
     $expire_date_time = time() + 60 * 60 * $hours;
     if ($permanent === TRUE){
       $expire_date_time = CACHE_PERMANENT;
     }
     si_exhibition_debug("si_exhibition_cache setting cache $prefix | $cache_name", $data);
     cache_set($prefix.$cache_name, $data, $cache_table_for_clearing, $expire_date_time);
-    $cache = cache_get($prefix.$cache_name, $cache_table_for_clearing);
+    $si_exhibition_quick_cache[$prefix.$cache_name.$cache_data_index] = $overwrite;
     return $overwrite;
   }
   si_exhibition_debug("si_exhibition_cache returning nothing found in cache");
@@ -468,7 +473,7 @@ function si_exhibition_get_pid_path_to_showing_concept($url = NULL) {
   $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['REQUEST_URI']);
   if (!empty($pid_path)) {
     si_exhibition_debug('setting session for pid path via server request_uri:' . $_SERVER['REQUEST_URI'], NULL, TRUE);
-		//$_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
+    //$_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
     return $pid_path;
   }
   $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['HTTP_REFERER']);
@@ -564,6 +569,7 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
   //Start cache check for return
   $cache_name = 'child_resource_info';
   $cache_index = $object_id.'_'.$type.'_'.$sort;
+  watchdog("exhibition",'si_exhibition_get_child_resource_info_by_id, cache_index :'.$cache_index);
   $to_return = si_exhibition_cache($cache_name,$cache_index);
   if (!empty($to_return)){ return $to_return; }
   si_exhibition_cron_cache(__FUNCTION__, func_get_args());
@@ -576,7 +582,7 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
     'csv' => array('si:datasetCModel'),
     'text' => FALSE,
     'video' => array('islandora:sp_videoCModel'),
-		'audio' => array('islandora:sp-audioCModel')
+    'audio' => array('islandora:sp-audioCModel')
   );
   $resources = array();
   $resource_types = isset($resource_types[$type]) ? $resource_types[$type] : FALSE;
@@ -658,8 +664,8 @@ function si_exhibition_fill_out_resources(&$resources, $show, $limit = NULL, $of
   $repo = tuque_wrapper_get_repository_instance();
   si_exhibition_debug('repo from si_exhibition_fill_out_resources');
   $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
-	foreach ($resources as $key => $resource) {
-     if ($key >= $offset && $key <= $offset+$limit){
+  foreach ($resources as $key => $resource) {
+   if ($key >= $offset && $key <= $offset+$limit){
       $object = $repo->getObject($resource['pid']); // We know it exists from the previous filter call.
       $resources[$key]['models'] = $object->models;
       $resources[$key]['datastreams'] = array();

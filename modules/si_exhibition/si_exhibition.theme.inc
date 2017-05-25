@@ -291,7 +291,7 @@ function theme_si_exhibition_parent_concepts($vars) {
     foreach($curr_tree_loc['children'] as $ctl_child) {
       if ($ctl_child['pid'] == $piece) {
         $curr_tree_loc = $ctl_child;
-				break;
+	break;
       }
     }
   }
@@ -301,8 +301,6 @@ function theme_si_exhibition_parent_concepts($vars) {
     $link = l($curr_tree_loc['label'], "fedora/repository/{$curr_tree_loc['pid']}", array('query' => array('path'=>$main_path)));
     $links = array($link);
   }
-
-  
   $item_list_array = array(
     'items'=>$links,
     'title'=>NULL,
@@ -339,8 +337,6 @@ function theme_si_exhibition_parent_concepts_optimum($vars) {
     $link = l($curr_tree_loc['label'], "fedora/repository/{$curr_tree_loc['pid']}", array('query' => array('path'=>$main_path)));
     $links = array($link);
   }
-
-  
   $item_list_array = array(
     'items'=>$links,
     'title'=>NULL,
