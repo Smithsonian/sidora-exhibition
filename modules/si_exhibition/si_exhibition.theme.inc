@@ -258,8 +258,8 @@ function theme_si_exhibition_navigation($vars){
   }
   $output = '<div id="si-navigation"><div id="si-navigation-inner">';
   $output .= (variable_get('si_exhibition_expose_block', 'no') == 'no' ? '<h2>' . t('Navigation') . '</h2>' : '');
-  $output .= theme('si_exhibition_parent_concepts_optimum', array('pid'=>$pid));
-  $output .= theme('si_exhibition_child_concepts_optimum',  array('pid'=>$pid));
+  $output .= theme('si_exhibition_parent_concepts', array('pid'=>$pid));
+  $output .= theme('si_exhibition_child_concepts',  array('pid'=>$pid));
   $output .= '</div></div>';
   return $output;
 }
@@ -269,6 +269,7 @@ function theme_si_exhibition_navigation($vars){
  *
  * Displays a list of parent concepts links.
  */
+/*
 function theme_si_exhibition_parent_concepts($vars) {
   $pid = $vars['pid'];
   global $main_path;
@@ -309,19 +310,23 @@ function theme_si_exhibition_parent_concepts($vars) {
   );
   return $header . (empty($links) ? t('This item is the root of the exhibition.') : theme('item_list', $item_list_array));
 }
-
-function theme_si_exhibition_parent_concepts_optimum($vars) {
-  watchdog("exhibition",'theme_si_exhibition_parent_concepts_optimum, pid:'.$vars['pid']);
+*/
+function theme_si_exhibition_parent_concepts($vars) {
+  watchdog("exhibition",'theme_si_exhibition_parent_concepts, pid:'.$vars['pid']);
   $pid = $vars['pid'];
   global $main_path;
   $full_path = (isset($_GET['path']) ? $_GET['path'] : '');
   $main_path = $full_path;
   if (!empty($main_path)) {
     $pid_path_array = explode(',',$main_path);
-    $last_parent = array_pop($pid_path_array);
+    $pid_array_values = array_values(array_slice($pid_path_array, -1));
+    $last_parent = $pid_array_values[0];
+		/* changes
+		$last_parent = array_pop($pid_path_array);
     array_push($pid_path_array,$last_parent);
+		*/
     $path_to_last_parent = implode('_',$pid_path_array);
-    $full_tree = si_exhibition_get_visibility_tree_optimum($last_parent,$path_to_last_parent); 
+    $full_tree = si_exhibition_get_visibility_tree($last_parent,$path_to_last_parent); 
     $curr_tree_loc = $full_tree;
     if (empty($curr_tree_loc)) return '';
     $lastComma = strrpos($main_path, ",");
@@ -352,38 +357,7 @@ function theme_si_exhibition_parent_concepts_optimum($vars) {
  * Displays a list of child concepts links along with their number of children.
  */
 function theme_si_exhibition_child_concepts($vars){
-  $pid = $vars['pid'];
-  global $main_path;
-  $header ='<h3>' . t('Child concepts') . '</h3>';
-  $main_path = (isset($_GET['path']) ? $_GET['path'] : '');
-  if (empty($main_path)){
-    $main_path = $pid;
-  }else{
-    $main_path .= ','.$pid;
-  }
-  $make_link = function($child) {
-    global $main_path;
-    if (strtolower($child['type']) == 'resource') return NULL;
-    return l($child['label'], "fedora/repository/{$child['pid']}", array('query' => array('path'=>$main_path)));
-  };
-  $vo = si_exhibition_get_visibility_object($pid);
-  if (empty($vo)) return '';
-  if (empty($vo['children'])) {
-    $vo['children'] = array();
-  }
-  $links = array_filter(array_map($make_link, $vo['children']));
-  
-  $item_list_array = array(
-    'items'=>$links, 
-    'title'=>NULL, 
-    'type'=>'ul', 
-    'attributes'=>array('class' => 'child-concepts'),
-  );
-  return $header . (empty($links) ? t('This item has no child concepts.') : theme('item_list', $item_list_array));
-}
-
-function theme_si_exhibition_child_concepts_optimum($vars){
-  watchdog("exhibition",'theme_si_exhibition_child_concepts_optimum, pid:'.$vars['pid']);
+  watchdog("exhibition",'theme_si_exhibition_child_concepts, pid:'.$vars['pid']);
   $pid = $vars['pid'];
   global $main_path;
   $header ='<h3>' . t('Child concepts') . '</h3>';
@@ -447,8 +421,15 @@ function theme_si_exhibition_metadata_xmls($vars){
     }
   }
   $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
-  array_push($parent_pid_path, $pid);
-  $vis_obj = si_exhibition_get_visibility_object_optimum($pid, $parent_pid_path);
+  // changes
+	$pid_array_values = array_values(array_slice($parent_pid_path, -1));
+	if ((!empty($pid_array_values)) && ($pid_array_values[0] == $pid)) array_pop($parent_pid_path);
+	//array_push($parent_pid_path, $pid);
+	/* If getting the metadata for a concept, it will be the last element in parent pid path.
+	 * si_exhibition_get_visibility_object adds the pid tot he parent pid path before sending for visibility request.
+	 * If getting the metadata for a resource, we don't need to do anything, since it will not be in the parent pid path
+	*/ 
+  $vis_obj = si_exhibition_get_visibility_object($pid, $parent_pid_path);
 	if (empty($vis_obj) || empty($vis_obj['show_meta'])) {
     //The page may be showing the metadata on a portion of the page and not a page of only metadata
     //If that is the case, just return without indication that metadata is not shown.
