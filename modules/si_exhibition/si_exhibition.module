@@ -336,7 +336,7 @@ function _si_show_exhibition(){
   $cache_name = 'show_exhibition';
   $cache_index = $pid_on_url.'_'.$path;
   $to_return = si_exhibition_cache($cache_name,$cache_index);
-  if (!empty($to_return)){ return $to_return; }
+	if (!empty($to_return)){ return $to_return; }
   si_exhibition_cron_cache(__FUNCTION__, func_get_args());
   //End cache
   // $bad_path and $bad_path_set are just for this function if caching is turned off
@@ -543,12 +543,16 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
 
     require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
     $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+		$pid_array_values = array_values(array_slice($parent_pid_path, -1));
+    if (is_array($pid_array_values)){
+     if ($pid_array_values[0] == $pid) array_pop($parent_pid_path);
+    }
     $vis_obj = si_exhibition_get_visibility_object($pid,$parent_pid_path);
      if (empty($vis_obj) || empty($vis_obj['show_preview'])) {
       si_exhibition_debug('Visibility object empty or show_preview was empty');
       if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
       //  print $pid;
-      //  var_dump($vis_obj);
+        var_dump($vis_obj);
       return MENU_NOT_FOUND;
     }
     
@@ -685,6 +689,10 @@ function si_exhibition_sidora_viewer($object){
   if ($viewer == 'OpenSeaDragon') {
     require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
     $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+		$pid_array_values = array_values(array_slice($parent_pid_path, -1));
+    if (is_array($pid_array_values)){
+     if ($pid_array_values[0] == $pid) array_pop($parent_pid_path);
+    }
     $vis_obj = si_exhibition_get_visibility_object($pid,$parent_pid_path);
     if (!empty($vis_obj['show_degraded'])) $viewer = 'browser_degraded';
   }
@@ -2793,7 +2801,7 @@ function si_exhibition_get_visibility_tree_children($pid = NULL,$path_to_pid = N
    if ($path_to_pid == '') $path_to_pid = $pid; 	
   $url_to_get = variable_get('si_exhibition_visibility_info_url', '');
   $url_to_get = si_exhibition_get_optimized_url($url_to_get,'json_visibility_children') . urlencode($path_to_pid);
-  //watchdog("exhibition",'si_exhibition_get_visibility_tree_children: url to get'.$url_to_get);
+  watchdog("exhibition",'si_exhibition_get_visibility_tree_children: url to get'.$url_to_get);
   if (array_key_exists($url_to_get, $GLOBALS)) {
     return $GLOBALS[$url_to_get];
   }
