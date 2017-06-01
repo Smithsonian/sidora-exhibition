@@ -14,6 +14,9 @@ function si_exhibition_ds(pid, dsid, title) {
         });
     return false; // Prevent Event Propagation
     */
+    jQuery("#exhibition_gray_overlay").remove();
+    jQuery("body").append("<div id='exhibition_gray_overlay' style='background-color:rgba(0,0,0,1);opacity:0.5;width:100%;height:100%;position:absolute;top:0;left:0'>");
+    jQuery("#exhibition_gray_overlay").append('<div id="sb-loading"><div id="sb-loading-inner"><span>&nbsp;</span></div></div>');
     $.ajax({
       type: "GET",
       url: Drupal.settings.basePath + "si/exhibition/datastream",
@@ -59,7 +62,9 @@ function si_exhibition_ds(pid, dsid, title) {
           options:    {onFinish: function(){recolorShadowboxTable();}}
         });
       }
-    );
+    ).always(function(jqXHR, textStatus) {
+      jQuery("#exhibition_gray_overlay").fadeOut();
+    });
   })(jQuery);
   return false; // Prevent Event Propagation
 }
@@ -102,8 +107,25 @@ function resourceChange(item){
 
 (function($){
   $(document).ready(function() {
+  var newLocation = window.location;
+  if (window.location.search.indexOf("?") == -1) {
+    newLocation += "?";
+  }
+  if (window.location.search.indexOf("&time=") == -1) {
+    newLocation += "&time=" + (new Date).getTime();
+    window.location = newLocation;
+    return;
+  }
  $('#forjstree').bind('loaded.jstree', function(e,data){setTimeout(function(){
-   jstreeIdSelected =  $('a[href=\"'+window.location.pathname + window.location.search+'\"]').parent().attr('id');
+
+   var params = getSearchParameters();
+   var idForSelection = 'a[href=\"'+window.location.pathname;
+   if (typeof(params['path']) !== "undefined") {
+     idForSelection += "?path=" + params['path'];
+   }
+   idForSelection += '\"]';
+
+   jstreeIdSelected =  $(idForSelection).parent().attr('id');
    toOpen = [];
    toOpen.unshift(jstreeIdSelected);
    while(toOpen[0] != false){
@@ -113,7 +135,7 @@ function resourceChange(item){
    for (i = 0; i < toOpen.length; i++){
      if (toOpen[i]) $('#forjstree').jstree('open_node','#'+toOpen[i]);
    }
-   $('#forjstree').jstree('select_node','a[href=\"'+window.location.pathname + window.location.search+'\"]');
+   $('#forjstree').jstree('select_node',idForSelection);
    $('#forjstree').bind('select_node.jstree', function(e,data) {
      window.location = jQuery('#'+data.selected[0]).children('a').attr('href');
    });
@@ -126,3 +148,20 @@ function resourceChange(item){
  $('#forjstree').jstree('open_all');
  });
 })(jQuery);
+
+
+function getSearchParameters() {
+      var prmstr = window.location.search.substr(1);
+      return prmstr != null && prmstr != "" ? transformToAssocArray(prmstr) : {};
+}
+
+function transformToAssocArray( prmstr ) {
+    var params = {};
+    var prmarr = prmstr.split("&");
+    for ( var i = 0; i < prmarr.length; i++) {
+        var tmparr = prmarr[i].split("=");
+        params[tmparr[0]] = tmparr[1];
+    }
+    return params;
+}
+

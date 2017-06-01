@@ -74,10 +74,21 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#title' => t('Turn on debugging mode.'),
       '#default_value' => variable_get('si_exhibition_debug',FALSE),
     ),
+    'si_exhibition_file_cache' => array(
+      '#type' => 'checkbox',
+      '#title' => t('Turn on File Caching.'),
+      '#default_value' => variable_get('si_exhibition_file_cache',TRUE),
+    ),
     'fedora_base_url' => array(
       '#type' => 'textfield',
       '#title' => t('Where to obtain the Fedora Commons objects'),
       '#default_value' => variable_get('fedora_base_url', 'http://localhost:8080/fedora'),
+      '#description' => t('The Fedora Commons Repo location'),
+    ),
+    'islandora_base_url' => array(
+      '#type' => 'textfield',
+      '#title' => t('Where to obtain the Fedora Commons objects when Islandora code attempts to get them'),
+      '#default_value' => variable_get('islandora_base_url', 'http://localhost:8080/fedora'),
       '#description' => t('The Fedora Commons Repo location'),
     ),
     'sidora_js_lib_location_jstree' => array(
@@ -88,7 +99,18 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#attributes' => array('size' => 120),
       '#maxlength' => 1024,
     ),
+    'si_exhibition_obj_allowed_for_viewers' => array(
+      '#type' => 'textfield',
+      '#title' => t('OBJ datastream allowed for these viewers'),
+      '#default_value' => variable_get('si_exhibition_obj_allowed_for_viewers', 'pdfjs'),
+      '#description' => t('Put in a comman separated list of viewers.  The full list of available viewers: %viewer_list',array('%viewer_list' => implode(', ',si_exhibition_sidora_viewers_available()))),
+      '#attributes' => array('size' => 120),
+      '#maxlength' => 1024,
+    ),
   );
+  if (!empty($_GET['session_show'])){
+    var_dump($_SESSION);
+  }
   _sidora_admin_settings_add_viewer_configs($form);
   return system_settings_form($form);
 }
