@@ -38,7 +38,7 @@ function si_exhibition_preprocess_si_exhibition_resources(array &$variables) {
     return $current ? '<strong>' . $text . '</strong>' : l($text, $_GET['q'], array('query' => $pager_params));
   };
   // Limit types
-  $variables['limit_types'] = array('all' => t('All'), 'images' => t('Images'), 'pdf' => t('PDF'), 'text' => t('Text'), 'csv' => t('CSV'), 'audio' => t('Audio'), 'video' => t('Video'));
+  $variables['limit_types'] = array('all' => t('All'), 'images' => t('Images'), 'pdf' => t('PDF'), 'text' => t('Text'), 'csv' => t('CSV'), 'audio' => t('Audio'), 'video' => t('Video'), 'generic' => t('Generic'), 'rawsequence' => t('Raw Sequences'), 'assembledsequence' => t('Assembled Sequences'));
   // Results per Page
   $variables['results_per_page'] =  array('10', '15', '20', '25', '30');
   // Table

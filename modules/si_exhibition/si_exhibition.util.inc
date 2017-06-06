@@ -505,7 +505,10 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
     'csv' => array('si:datasetCModel'),
     'text' => FALSE,
     'video' => array('islandora:sp_videoCModel'),
-    'audio' => array('islandora:sp-audioCModel')
+    'audio' => array('islandora:sp-audioCModel'),
+    'generic' => array('si:genericCModel'),
+    'rawsequence' => array('si:rawGeneSequenceCModel'),
+    'assembledsequence' => array('si:assembledGeneSequenceCModel')
   );
   $resources = array();
   $resource_types = isset($resource_types[$type]) ? $resource_types[$type] : FALSE;
