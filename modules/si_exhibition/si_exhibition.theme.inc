@@ -95,7 +95,8 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   if (empty($resource['models'])) {return '';}
   $display_datastream_function = '';
   // @todo use drupal behaviours and settings instead.
-  $display_definitions = array(
+  $display = array();
+	$display_definitions = array(
     'si:imageCModel' => array(
       'dsid' => 'IMAGE',
       'view' => 'IMAGE',
@@ -149,6 +150,33 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       'func' => 'si_exhibition_ds',
       'type' => array('r-csv', 'csv'), // Icon, Label
       'class' => 'resources-video'
+    ),
+    'si:genericCModel' => array(
+      'dsid' => '',
+      'view' => '',
+      'tn' => TRUE,
+      'url' => '',
+      'func' => 'si_exhibition_ds',
+      'type' => array('r-csv', 'csv'), // Icon, Label
+      'class' => 'resources-generic'
+    ),
+    'si:rawGeneSequenceCModel' => array(
+      'dsid' => '',
+      'view' => '',
+      'tn' => TRUE,
+      'url' => '',
+      'func' => 'si_exhibition_ds',
+      'type' => array('r-csv', 'csv'), // Icon, Label
+      'class' => 'resources-genome'
+    ),
+    'si:assembledGeneSequenceCModel' => array(
+      'dsid' => '',
+      'view' => '',
+      'tn' => TRUE,
+      'url' => '',
+      'func' => 'si_exhibition_ds',
+      'type' => array('r-csv', 'csv'), // Icon, Label
+      'class' => 'resources-genome'
     ),
   );
   /*

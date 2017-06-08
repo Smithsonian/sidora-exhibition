@@ -2500,6 +2500,9 @@ function exhibition_resources_form($form, &$form_state){
       'csv' => t('Tabular Datasets'),
       'audio' => t('Audio'),
       'video' => t('Video'),
+      'generic' => t('Generic'),
+      'rawsequence' => t('Raw Sequences'),
+      'assembledsequence' => t('Assembled Sequences'),
     ),
   );
   $form['limit'] = array(
