@@ -61,59 +61,49 @@ function si_exhibition_check_visibility($to_check_pid, $parent_pid_path = NULL) 
  * different visibility settings on their children between each occurrance.
  *
  */
+
 function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = NULL) {
   if ($parent_pid_path === NULL) {
     // Find where the path of the current concept from the exhibition root
     $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
   }
+  //watchdog("exhibition",'si_exhibition_get_visibility_object, getting visibility for :'.$to_check_pid);
+  // Go to that place in the visibility tree
+  // Return if the child pid is there
+  if (!empty($to_check_pid)) {
+   if (!empty($parent_pid_path)){
+    $path_to_pid = implode('_',$parent_pid_path) . '_' . $to_check_pid;
+    $vis_tree = si_exhibition_get_visibility_tree($to_check_pid,$path_to_pid);
+    return $vis_tree;
+  }
+  else {
+    //The parent path is empty, so we are looking for the root pid to match the checking_pid
+    $parent_pid_path = $to_check_pid;
+    $vis_tree = si_exhibition_get_visibility_tree($to_check_pid,$parent_pid_path);
+    if (!empty($vis_tree) && !empty($vis_tree['pid'])){
+      if ($vis_tree['pid'] == $to_check_pid) {
+        return $vis_tree;
+      }
+    }
+  }
+  }
+  return FALSE;
+}
+
+function si_exhibition_get_visibility_object_children($to_check_pid, $parent_pid_path = NULL) {
+  if ($parent_pid_path === NULL) {
+    // Find where the path of the current concept from the exhibition root
+    $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+    //watchdog("exhibition",'si_exhibition_get_visibility_object_children: path to pid'.implode(',', $parent_pid_path) . ' for pid : ' . $to_check_pid);
+  }
   // Go to that place in the visibility tree
   // Return if the child pid is there
   if (!empty($parent_pid_path)){
-    $vis_tree = si_exhibition_get_visibility_tree($parent_pid_path[0]);
+    $path_to_pid = implode('_',$parent_pid_path);
+    //watchdog("exhibition",'si_exhibition_get_visibility_object_children: path to pid'.$path_to_pid);
+    $vis_tree = si_exhibition_get_visibility_tree_children($to_check_pid,$path_to_pid);
     $curr_children = array($vis_tree);
-    foreach($parent_pid_path as $curr_pid){
-      $found_next_child = FALSE;
-      $next_children = NULL;
-      $curr_parent = NULL;
-      foreach($curr_children as $curr_child) {
-        if ($curr_child['pid'] == $curr_pid) {
-          $found_next_child = TRUE;
-          if (array_key_exists('children', $curr_child)) {
-            $next_children = $curr_child['children'];
-          }
-          else {
-            $next_children = array(); 
-          }
-          $curr_parent = $curr_child;
-        }
-      }
-      if ($found_next_child) {
-        $curr_children = $next_children;
-      }
-      else {
-        return FALSE;
-      }
-    }
-    $debug_info = array();
-    $debug_info['cc'] = $curr_children;
-    $debug_info['cp'] = $curr_parent;
-    $debug_info['args'] = func_get_args();
-    si_exhibition_debug('get_visibility_object', $debug_info);
-
-    //If we're looking for a concept then we should have ended up at the concept
-    if ($curr_parent['pid'] == $to_check_pid) {
-      return $curr_parent;//array('show_meta'=>TRUE);//$curr_parent;
-    }
-    
-    //If it's made it here, then it didn't return false when attempting to go down the wrong path
-    //So the object that is located in $curr_children will hold all the valid objects that will be
-    //visible
-    foreach($curr_children as $curr_child){
-      if ($curr_child['pid'] == $to_check_pid){
-        return $curr_child;
-      }
-    }
-    return FALSE;
+    return $vis_tree;
   }
   else {
     //The parent path is empty, so we are looking for the root pid to match the checking_pid
@@ -126,13 +116,25 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
   }
   return FALSE;
 }
+
 /*
 * For exhibitions, hide parents that aren't supposed to be shown, only the parents that should be in the current exhibition path
 * Only used in the si_exhibition_get_parent_info function
 */
 function si_exhibition_check_parent_in_tree(array $object_info, $tree_pid) {
   $tree_pid_list = array();
-  $tree = _si_exhibition_get_pid_tree($tree_pid, null, $tree_pid_list);
+  $tree = '';
+  if (variable_get('si_exhibition_file_cache', FALSE)) $tree = _si_exhibition_get_pid_tree_from_cache($tree_pid);
+    if (empty($tree)) {
+     $tree = _si_exhibition_get_pid_tree($tree_pid, null, $tree_pid_list, array($tree_pid));
+     if (variable_get('si_exhibition_file_cache', FALSE)) {
+       $return_from_write = _si_exhibition_get_pid_tree_to_cache($tree_pid,$tree);
+      watchdog("exhibition",'si_exhibition_check_parent_in_tree, writing to file cache :'.$return_from_write);
+      }	
+     }
+     else {
+      _si_exhibition_get_pid_list_from_tree(array($tree),$tree_pid_list);
+     }	
   return in_array($object_info['pid'], $tree_pid_list);
 }
 
@@ -275,9 +277,10 @@ function si_exhibition_generate_child_concept_query($pid) {
 /*
  * Enable verbose levels of debugging
  */
-function si_exhibition_debug($message, $object = NULL){
+function si_exhibition_debug($message, $object = NULL, $also_watchdog = FALSE){
   if (variable_get('si_exhibition_debug',FALSE)){
     drupal_set_message($message);
+    $content = '';
     if (!empty($object)){
       ob_start();
       print '<div id="" style="overflow-y: scroll; max-height:400px;">';
@@ -287,6 +290,9 @@ function si_exhibition_debug($message, $object = NULL){
       print '</div>';
       $content = ob_get_clean();
       drupal_set_message($content);
+    }
+    if ($also_watchdog) {
+      watchdog('sidora_debug', $message . $content);
     }
   }
 }
@@ -298,9 +304,10 @@ function si_exhibition_debug($message, $object = NULL){
  * Saves data in the cache if "overwrite" parameter has a value
  * If permanent set to true, will not expire
  */
+ $si_exhibition_quick_cache = array();
 function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE, $permanent = FALSE){
-  global $tnum;
-  si_exhibition_debug("si_exhibition_cache " . json_encode($cache_name) . " | " . json_encode($cache_data_index) . " | " . json_encode($overwrite) . " | " . json_encode($permanent) ." |");
+  global $si_exhibition_quick_cache;
+  si_exhibition_debug("si_exhibition_cache <pre>" . json_encode($cache_name) . " | " . json_encode($cache_data_index) . " | " . json_encode($overwrite) . " | " . json_encode($permanent) ." |</pre>");
   if (!variable_get('si_exhibition_cache_on',TRUE)){
     si_exhibition_debug("si_exhibition_cache is turned off");
     if ($overwrite !== FALSE) return $overwrite; //If caching is turned off, don't use caching!
@@ -309,6 +316,9 @@ function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE,
   $prefix = 'si_exhibition_cache_';
   $cache_table_for_clearing = 'cache';
   if ($overwrite === FALSE){
+    if (!empty($si_exhibition_quick_cache[$prefix.$cache_name.$cache_data_index])){
+      return $si_exhibition_quick_cache[$prefix.$cache_name.$cache_data_index];
+    }
     $cache = NULL;
     if ($cache_info = cache_get($prefix.$cache_name, $cache_table_for_clearing)){
       $cache = $cache_info->data;
@@ -328,14 +338,14 @@ function si_exhibition_cache($cache_name, $cache_data_index, $overwrite = FALSE,
       $data = $cache_info->data;
     }
     $data[$cache_data_index] = $overwrite;
-    $hours = 3;
+    $hours = 12;
     $expire_date_time = time() + 60 * 60 * $hours;
     if ($permanent === TRUE){
       $expire_date_time = CACHE_PERMANENT;
     }
     si_exhibition_debug("si_exhibition_cache setting cache $prefix | $cache_name", $data);
     cache_set($prefix.$cache_name, $data, $cache_table_for_clearing, $expire_date_time);
-    $cache = cache_get($prefix.$cache_name, $cache_table_for_clearing);
+    $si_exhibition_quick_cache[$prefix.$cache_name.$cache_data_index] = $overwrite;
     return $overwrite;
   }
   si_exhibition_debug("si_exhibition_cache returning nothing found in cache");
@@ -380,22 +390,39 @@ function si_exhibition_cron_cache($function_name = FALSE, $arguments = FALSE){
  */
 function si_exhibition_get_pid_path_to_showing_concept($url = NULL) {
   if (!empty($url)) {
+    si_exhibition_debug('pid path via non-empty url' . $url, NULL, TRUE);
     return si_exhibition_get_pid_path_to_concept_by_url($url);
   }
   $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['REQUEST_URI']);
   if (!empty($pid_path)) {
-    $_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
+    si_exhibition_debug('setting session for pid path via server request_uri:' . $_SERVER['REQUEST_URI'], NULL, TRUE);
+    //$_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
     return $pid_path;
   }
   $pid_path = si_exhibition_get_pid_path_to_concept_by_url($_SERVER['HTTP_REFERER']);
   if (!empty($pid_path)) {
-    $_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
+    si_exhibition_debug('setting session for pid path via server referrer:' . $_SERVER['HTTP_REFERER'], NULL, TRUE);
+    //$_SESSION['si_exhibition_latest_pid_path'] = $pid_path;
     return $pid_path;
   }
+  /*
   if (!empty($_SESSION['si_exhibition_latest_pid_path'])){
+    si_exhibition_debug('returning pid path based on the existing session:' . json_encode($_SESSION['si_exhibition_latest_pid_path']), NULL, TRUE);
     return $_SESSION['si_exhibition_latest_pid_path'];
   }
-  return array();
+  si_exhibition_debug("Did not find a good path, here is all the info:".
+  ' $_SESSION[si_exhibition_latest_pid_path]'.
+  (empty($_SESSION['si_exhibition_latest_pid_path'])?'empty':$_SESSION['si_exhibition_latest_pid_path']).
+  ' $_SERVER[HTTP_REFERER]'.
+  $_SERVER['HTTP_REFERER'].
+  ' $_SERVER[REQUEST_URI]'.
+  $_SERVER['REQUEST_URI'].
+  '$url'.
+  $url, empty($_SESSION)?array():$_SESSION, TRUE);
+  /*
+  */
+  $pid_path = array(arg(2));
+  return $pid_path;
 }
 /*
  * Return whether a string has the possibility of being a pid
@@ -418,6 +445,9 @@ function si_exhibition_get_pid_path_to_concept_by_url($url) {
     $fr_location = strpos($request_path,'/fedora/repository/');
     if ($fr_location !== FALSE) {
       $final_pid = urldecode(substr($request_path,$fr_location+19));
+      if (strpos($final_pid,'/') > 0) {
+        $final_pid = substr($final_pid,0,strpos($final_pid,'/'));
+      }
       if (si_exhibition_check_valid_pid($final_pid)) {
         if (!empty($url_info['query'])) {
           parse_str($url_info['query'],$query_holder);
@@ -459,10 +489,10 @@ function si_exhibition_get_child_resource_info(FedoraObject $object, $type = 'al
   return si_exhibition_get_child_resource_info_by_id($object->id, $type, $sort);
 }
 function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', $sort = 'asc') {
-
   //Start cache check for return
   $cache_name = 'child_resource_info';
   $cache_index = $object_id.'_'.$type.'_'.$sort;
+  watchdog("exhibition",'si_exhibition_get_child_resource_info_by_id, cache_index :'.$cache_index);
   $to_return = si_exhibition_cache($cache_name,$cache_index);
   if (!empty($to_return)){ return $to_return; }
   si_exhibition_cron_cache(__FUNCTION__, func_get_args());
@@ -475,15 +505,18 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
     'csv' => array('si:datasetCModel'),
     'text' => FALSE,
     'video' => array('islandora:sp_videoCModel'),
-		'audio' => array('islandora:sp-audioCModel')
+    'audio' => array('islandora:sp-audioCModel'),
+    'generic' => array('si:genericCModel'),
+    'rawsequence' => array('si:rawGeneSequenceCModel'),
+    'assembledsequence' => array('si:assembledGeneSequenceCModel')
   );
   $resources = array();
   $resource_types = isset($resource_types[$type]) ? $resource_types[$type] : FALSE;
   $parent_path = si_exhibition_get_pid_path_to_showing_concept();
   array_pop($parent_path); //Remove the current concept from the "parents" list
-  $vis_obj = si_exhibition_get_visibility_object($object_id, $parent_path); //Get the visibility of the current concept
-
-  //Walk through the visibility pulling out the type and number of items asked for
+  $vis_obj = si_exhibition_get_visibility_object_children($object_id);
+  watchdog("exhibition",'si_exhibition_get_child_resource_info_by_id for :'.$object_id);
+	//Walk through the visibility pulling out the type and number of items asked for
   $count_so_far = 0;
   $resources = array();
   if (empty($vis_obj)){
@@ -555,8 +588,9 @@ function si_exhibition_fill_out_resources(&$resources, $show, $limit = NULL, $of
   if (empty($offset)) $offset = 0;
   $repo = tuque_wrapper_get_repository_instance();
   si_exhibition_debug('repo from si_exhibition_fill_out_resources');
+  $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
   foreach ($resources as $key => $resource) {
-     if ($key >= $offset && $key <= $offset+$limit){
+   if ($key >= $offset && $key <= $offset+$limit){
       $object = $repo->getObject($resource['pid']); // We know it exists from the previous filter call.
       $resources[$key]['models'] = $object->models;
       $resources[$key]['datastreams'] = array();
@@ -572,7 +606,12 @@ function si_exhibition_fill_out_resources(&$resources, $show, $limit = NULL, $of
           unset($resources[$key]);
         }
       }
-      $visibility_obj = si_exhibition_get_visibility_object($resource['pid']);
+      $path_to_pid = $parent_pid_path;
+      // changes
+			/* don't need to add the resource to the parent pid path since its being added in si_exhibition_get_visibility_object
+			*/
+			//array_push($path_to_pid,$resource['pid']);
+      $visibility_obj = si_exhibition_get_visibility_object($resource['pid'],$path_to_pid);
       $resources[$key]['visibility'] = $visibility_obj;
     }
   }

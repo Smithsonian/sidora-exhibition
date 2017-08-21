@@ -74,6 +74,11 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#title' => t('Turn on debugging mode.'),
       '#default_value' => variable_get('si_exhibition_debug',FALSE),
     ),
+    'si_exhibition_file_cache' => array(
+      '#type' => 'checkbox',
+      '#title' => t('Turn on File Caching.'),
+      '#default_value' => variable_get('si_exhibition_file_cache',TRUE),
+    ),
     'fedora_base_url' => array(
       '#type' => 'textfield',
       '#title' => t('Where to obtain the Fedora Commons objects'),
@@ -103,6 +108,9 @@ function si_exhibition_admin_settings($form, &$form_state) {
       '#maxlength' => 1024,
     ),
   );
+  if (!empty($_GET['session_show'])){
+    var_dump($_SESSION);
+  }
   _sidora_admin_settings_add_viewer_configs($form);
   return system_settings_form($form);
 }

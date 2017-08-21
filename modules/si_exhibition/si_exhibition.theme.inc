@@ -38,7 +38,7 @@ function si_exhibition_preprocess_si_exhibition_resources(array &$variables) {
     return $current ? '<strong>' . $text . '</strong>' : l($text, $_GET['q'], array('query' => $pager_params));
   };
   // Limit types
-  $variables['limit_types'] = array('all' => t('All'), 'images' => t('Images'), 'pdf' => t('PDF'), 'text' => t('Text'), 'csv' => t('CSV'), 'audio' => t('Audio'), 'video' => t('Video'));
+  $variables['limit_types'] = array('all' => t('All'), 'images' => t('Images'), 'pdf' => t('PDF'), 'text' => t('Text'), 'csv' => t('CSV'), 'audio' => t('Audio'), 'video' => t('Video'), 'generic' => t('Generic'), 'rawsequence' => t('Raw Sequences'), 'assembledsequence' => t('Assembled Sequences'));
   // Results per Page
   $variables['results_per_page'] =  array('10', '15', '20', '25', '30');
   // Table
@@ -95,7 +95,8 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   if (empty($resource['models'])) {return '';}
   $display_datastream_function = '';
   // @todo use drupal behaviours and settings instead.
-  $display_definitions = array(
+  $display = array();
+	$display_definitions = array(
     'si:imageCModel' => array(
       'dsid' => 'IMAGE',
       'view' => 'IMAGE',
@@ -150,6 +151,33 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       'type' => array('r-csv', 'csv'), // Icon, Label
       'class' => 'resources-video'
     ),
+    'si:genericCModel' => array(
+      'dsid' => '',
+      'view' => '',
+      'tn' => TRUE,
+      'url' => '',
+      'func' => 'si_exhibition_ds',
+      'type' => array('r-csv', 'csv'), // Icon, Label
+      'class' => 'resources-generic'
+    ),
+    'si:rawGeneSequenceCModel' => array(
+      'dsid' => '',
+      'view' => '',
+      'tn' => TRUE,
+      'url' => '',
+      'func' => 'si_exhibition_ds',
+      'type' => array('r-csv', 'csv'), // Icon, Label
+      'class' => 'resources-genome'
+    ),
+    'si:assembledGeneSequenceCModel' => array(
+      'dsid' => '',
+      'view' => '',
+      'tn' => TRUE,
+      'url' => '',
+      'func' => 'si_exhibition_ds',
+      'type' => array('r-csv', 'csv'), // Icon, Label
+      'class' => 'resources-genome'
+    ),
   );
   /*
   print '<div style="padding:20px;">';
@@ -159,7 +187,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   */
   $aik = array_intersect_key($display_definitions, array_flip($resource['models']));
   $display = array_pop($aik); // Assuming an object can't be two types of resources.
-	$display['url'] = (isset($display['url'])?$display['url']:'');
+  $display['url'] = (isset($display['url'])?$display['url']:'');
   $label = $resource['label'];
   // Metadata
   //$display_metadata_function = 'return si_exhibition_ds("' . $resource['pid'] . '", "METADATA")';
@@ -175,7 +203,8 @@ function _si_exhibition_get_resource_table_row(array $resource) {
     if (!empty($available_view)){ $display['view'] = $available_view;  }
     $preview = '';
     if (array_search($display['view'], $resource['datastreams']) !== FALSE) {
-	$thumbnail_url = url("fedora/repository/{$resource['pid']}/TN/tn.jpg");
+	//$thumbnail_url = url("fedora/repository/{$resource['pid']}/TN/tn.jpg")."?path=".implode(',',si_exhibition_get_pid_path_to_showing_concept());
+	$thumbnail_url = url("si/exhibition/tn/{$resource['pid']}/TN/tn.jpg")."?path=".implode(',',si_exhibition_get_pid_path_to_showing_concept());
       if (array_search('si:datasetCModel', $resource['models']) !== FALSE) {
         $thumbnail_url = $GLOBALS['base_url'].'/'.drupal_get_path('module','si_exhibition').'/images/icons/x-office-spreadsheet.png';
       }	
@@ -184,10 +213,12 @@ function _si_exhibition_get_resource_table_row(array $resource) {
       }	
      $view_preview = (isset($display['tn']) && (array_search('TN', $resource['datastreams']) !== FALSE || array_search('si:datasetCModel', $resource['models']) !== FALSE || in_array('si:fieldbookCModel',$resource['models']))) ? "<img alt='image thumbnail for {$resource['label']}' class='resource-tn' src='$thumbnail_url'/>" : '';
       if (isset($display['url'])) {
-        $prefix = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}") . '" rel="shadowbox" title="' . $resource['label'] . '">';
-        $postfix = '</a>';
-        $view = $prefix . $view_preview . $postfix;
-        $preview = $prefix . 'Preview' . $postfix;
+        $pptsc = si_exhibition_get_pid_path_to_showing_concept();
+        $path_including_last = implode(',',$pptsc);
+	  $prefix = '<a href="' . url("fedora/repository/{$resource['pid']}/{$display['url']}")."?path=".$path_including_last . '" rel="shadowbox" title="' . $resource['label'] . '">';
+       $postfix = '</a>';
+       $view = $prefix . $view_preview . $postfix;
+       $preview = $prefix . 'Preview' . $postfix;
       }
       else {
         $display_datastream_function = "return {$display['func']}('{$resource['pid']}', '{$display['view']}');";
@@ -266,12 +297,13 @@ function theme_si_exhibition_navigation($vars){
  *
  * Displays a list of parent concepts links.
  */
+/*
 function theme_si_exhibition_parent_concepts($vars) {
   $pid = $vars['pid'];
   global $main_path;
   $full_path = (isset($_GET['path']) ? $_GET['path'] : '');
   $main_path = $full_path;
-  if (!empty($main_path)) {
+	if (!empty($main_path)) {
     $lastComma = strrpos($main_path, ",");
     if ($lastComma === false) {
       $main_path = '';
@@ -288,6 +320,7 @@ function theme_si_exhibition_parent_concepts($vars) {
     foreach($curr_tree_loc['children'] as $ctl_child) {
       if ($ctl_child['pid'] == $piece) {
         $curr_tree_loc = $ctl_child;
+	break;
       }
     }
   }
@@ -297,8 +330,46 @@ function theme_si_exhibition_parent_concepts($vars) {
     $link = l($curr_tree_loc['label'], "fedora/repository/{$curr_tree_loc['pid']}", array('query' => array('path'=>$main_path)));
     $links = array($link);
   }
-
-  
+  $item_list_array = array(
+    'items'=>$links,
+    'title'=>NULL,
+    'type'=>'ul',
+    'attributes'=>array('class' => 'parent-concepts'),
+  );
+  return $header . (empty($links) ? t('This item is the root of the exhibition.') : theme('item_list', $item_list_array));
+}
+*/
+function theme_si_exhibition_parent_concepts($vars) {
+  watchdog("exhibition",'theme_si_exhibition_parent_concepts, pid:'.$vars['pid']);
+  $pid = $vars['pid'];
+  global $main_path;
+  $full_path = (isset($_GET['path']) ? $_GET['path'] : '');
+  $main_path = $full_path;
+  if (!empty($main_path)) {
+    $pid_path_array = explode(',',$main_path);
+    $pid_array_values = array_values(array_slice($pid_path_array, -1));
+    $last_parent = $pid_array_values[0];
+		/* changes
+		$last_parent = array_pop($pid_path_array);
+    array_push($pid_path_array,$last_parent);
+		*/
+    $path_to_last_parent = implode('_',$pid_path_array);
+    $full_tree = si_exhibition_get_visibility_tree($last_parent,$path_to_last_parent); 
+    $curr_tree_loc = $full_tree;
+    if (empty($curr_tree_loc)) return '';
+    $lastComma = strrpos($main_path, ",");
+    if ($lastComma === false) {
+      $main_path = '';
+    } else {
+      $main_path = substr($main_path, 0, $lastComma);
+    }
+  }
+  $header = '<h3>' . t('Parent concept') . '</h3>';
+  $links = array();
+  if (!empty($full_path)) {
+    $link = l($curr_tree_loc['label'], "fedora/repository/{$curr_tree_loc['pid']}", array('query' => array('path'=>$main_path)));
+    $links = array($link);
+  }
   $item_list_array = array(
     'items'=>$links,
     'title'=>NULL,
@@ -314,6 +385,7 @@ function theme_si_exhibition_parent_concepts($vars) {
  * Displays a list of child concepts links along with their number of children.
  */
 function theme_si_exhibition_child_concepts($vars){
+  watchdog("exhibition",'theme_si_exhibition_child_concepts, pid:'.$vars['pid']);
   $pid = $vars['pid'];
   global $main_path;
   $header ='<h3>' . t('Child concepts') . '</h3>';
@@ -328,7 +400,7 @@ function theme_si_exhibition_child_concepts($vars){
     if (strtolower($child['type']) == 'resource') return NULL;
     return l($child['label'], "fedora/repository/{$child['pid']}", array('query' => array('path'=>$main_path)));
   };
-  $vo = si_exhibition_get_visibility_object($pid);
+  $vo = si_exhibition_get_visibility_object_children($pid);
   if (empty($vo)) return '';
   if (empty($vo['children'])) {
     $vo['children'] = array();
@@ -367,20 +439,30 @@ function HandleXmlError($errno, $errstr, $errfile, $errline)
  */
 function theme_si_exhibition_metadata_xmls($vars){
   $pid = $vars['pid'];
+  watchdog("exhibition",'in theme metadata, pid:'.$pid);
   if (variable_get('si_exhibition_anonymous_only', FALSE)){
     if (!si_exhibition_check_view_permission($pid)){
       si_exhibition_debug('view_permission was false');
-      watchdog("exhibition","watchdog view_permission was false:".$pid);
+      watchdog("exhibition","in theme metadata, view_permission was false:".$pid);
       drupal_not_found();
       return;
     }
   }
-  $vis_obj = si_exhibition_get_visibility_object($pid);
-  if (empty($vis_obj) || empty($vis_obj['show_meta'])) {
+  $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
+  // changes
+	$pid_array_values = array_values(array_slice($parent_pid_path, -1));
+	if ((!empty($pid_array_values)) && ($pid_array_values[0] == $pid)) array_pop($parent_pid_path);
+	//array_push($parent_pid_path, $pid);
+	/* If getting the metadata for a concept, it will be the last element in parent pid path.
+	 * si_exhibition_get_visibility_object adds the pid tot he parent pid path before sending for visibility request.
+	 * If getting the metadata for a resource, we don't need to do anything, since it will not be in the parent pid path
+	*/ 
+  $vis_obj = si_exhibition_get_visibility_object($pid, $parent_pid_path);
+	if (empty($vis_obj) || empty($vis_obj['show_meta'])) {
     //The page may be showing the metadata on a portion of the page and not a page of only metadata
     //If that is the case, just return without indication that metadata is not shown.
     si_exhibition_debug('empty visibility object or show_meta empty:'.$pid);
-    watchdog("exhibition",'empty visibility object or show_meta empty:'.$pid);
+    watchdog("exhibition",'in theme metadata,empty visibility object or show_meta empty:'.$pid);
     return '';
   }
   $rows = si_models_get_display_xmls($pid);
@@ -388,7 +470,10 @@ function theme_si_exhibition_metadata_xmls($vars){
   $output = $datastream_content;
   $doc = new DOMDocument();
   $xsl = new XSLTProcessor();
-  $pid_to_check = si_exhibition_get_parent_xsl($pid);
+  $pid_to_check = $pid;
+  if (strpos(strtolower($vis_obj['type']),'concept') !== false) {
+    $pid_to_check = si_exhibition_get_parent_xsl($pid);
+  } 
   $xsl_string = si_exhibition_xsl_string($pid_to_check);
   if ($xsl_string === FALSE){
     //No XSL string (bad news)
@@ -443,7 +528,8 @@ function theme_si_exhibition_metadata_xmls($vars){
       $properOutput .= '<tr class="odd">'.$tableRows[$trNum];
     }
   }
-  return $properOutput; 
+
+	return $properOutput; 
 }
 /**
  * Implements theme_hook().
