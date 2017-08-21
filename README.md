@@ -1,3 +1,9 @@
+Version 0.5.4
+New viewable types and performance enhancements
+
+Version 0.5.3
+New Exhibition visibility format
+
 Version 0.5.2
 
 XSLT and caching improvements
