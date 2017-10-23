@@ -336,7 +336,9 @@ function _si_show_exhibition(){
   $cache_name = 'show_exhibition';
   $cache_index = $pid_on_url.'_'.$path;
   $to_return = si_exhibition_cache($cache_name,$cache_index);
-	if (!empty($to_return)){ return $to_return; }
+  if (!empty($to_return)){
+    return $to_return;
+  }
   si_exhibition_cron_cache(__FUNCTION__, func_get_args());
   //End cache
   // $bad_path and $bad_path_set are just for this function if caching is turned off
@@ -368,6 +370,8 @@ function _si_show_exhibition(){
         $bad_path = true;
       }
     }
+    watchdog('exhibition',"_si_show_exhibition path_list:" . json_encode($path_list));
+    watchdog('exhibition',"_si_show_exhibition tree_pid_list:" . json_encode($tree_pid_list));
     if ($bad_path) {
       try{
       // See if this is a resource of the final item in the path
@@ -375,6 +379,7 @@ function _si_show_exhibition(){
       if (is_array($pid_array_values)){
         $possible_parent_pid = $pid_array_values[0];
         $children = si_exhibition_get_child_resource_info_by_id($possible_parent_pid);
+        watchdog('exhibition',"_si_show_exhibition child pids for:" . $possible_parent_pid . " are:" . json_encode($children));
         if (is_array($children)) {
           foreach($children as $child) {
             if ($child['pid'] == $pid_on_url) {

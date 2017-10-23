@@ -523,6 +523,11 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
     //The visibility object needs to exist to pull info from it
     return NULL;
   }
+  watchdog("exhibition",'si_exhibition_get_child_resource_info_by_id vis_obj:'. json_encode($vis_obj));
+  // There are apparently multiple ways this is set up -- which is bad, for two reasons: Harder to maintain and can get to grandchild skipping a parent
+  // The ways that they are set up:
+  // One way is that we have the children as a array under vis_obj with key children
+  // The other way is that we have the child directly in vis_obj
   if (array_key_exists('children', $vis_obj)) {
     foreach($vis_obj['children'] as $child_vis_obj) {
       if (
@@ -549,28 +554,11 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
       }
     }
   }
-
-  $resources =  array_filter($resources, 'si_exhibition_check_object_info_accessible'); //BBB Security changes will necessitate this being used
-  /*
-  $visible_child_list = array();
-  if (!empty($vis_obj) && !empty($vis_obj['children'])) {
-    //Fill up the list of items that the current concept has as visible children
-    foreach($vis_obj['children'] as $child_vis_obj) {
-      if (
-          !empty($child_vis_obj['pid']) && 
-          !empty($child_vis_obj['show_name']) && 
-          !empty($child_vis_obj['type']) && 
-          ($child_vis_obj['type'] == 'resource')
-         ) {
-        $visible_child_list[] = $child_vis_obj['pid'];
-      }
-    }
+  if (array_key_exists('pid', $vis_obj)) {
+    $resources[] = array('pid' => $vis_obj['pid'], 'label' => $vis_obj['label']);  
   }
-  //Only return resources that should be visible
-  $resources = array_filter($resources, function($elem) use($visible_child_list){
-     return in_array($elem['pid'],$visible_child_list);
-  });
-  */
+  watchdog("exhibition",'si_exhibition_get_child_resource_info_by_id resources, prefilter:'. json_encode($resources));
+  $resources =  array_filter($resources, 'si_exhibition_check_object_info_accessible'); //BBB Security changes will necessitate this being used
   $to_return = $resources;
   return si_exhibition_cache($cache_name, $cache_index, $to_return);
 }
