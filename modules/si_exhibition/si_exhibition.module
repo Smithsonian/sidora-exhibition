@@ -443,6 +443,10 @@ function si_exhibition_get_tn($pid = NULL, $dsid  = NULL) {
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $pid = isset($pid) ? $pid : variable_get('fedora_repository_pid', 'si:root');
   $object = sidora_obj($pid);
+  if (empty($object)) {
+    watchdog('exhibition', 'si_exhibition_get_tn bad object: !pid', array('!pid' => $pid));
+    exit();
+  }
   drupal_add_css(drupal_get_path('module', 'si_exhibition') . '/css/si-exhibition.css');
   $jstreepath = variable_get('sidora_js_lib_location_jstree', '');
   drupal_add_css($jstreepath . 'themes/default/style.min.css', array('type' => 'external'));
@@ -488,6 +492,10 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $pid = isset($pid) ? $pid : variable_get('fedora_repository_pid', 'si:root');
   $object = sidora_obj($pid);
+  if (empty($object)) {
+    watchdog('exhibition', 'si_exhibition bad object: !pid', array('!pid' => $pid));
+    exit();
+  }
   drupal_add_css(drupal_get_path('module', 'si_exhibition') . '/css/si-exhibition.css');
   $jstreepath = variable_get('sidora_js_lib_location_jstree', '');
   drupal_add_css($jstreepath . 'themes/default/style.min.css', array('type' => 'external'));
@@ -621,7 +629,6 @@ function sidora_obj($pid){
         var_dump($description);
         $desc_as_string = ob_get_clean();
         watchdog('exhibition', '404 error getting pid:'.$pid.'. Trying to get Fedora description, it described itself:'. $desc_as_string);
-        //dsm('Could not reach Fedora');
         //drupal_not_found();
         if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
         break;
@@ -643,12 +650,11 @@ function sidora_obj($pid){
           '%line' => $caller['line']
         );
         watchdog('si_exhibition', $message, $variables, WATCHDOG_ERROR, NULL);
-        //dsm('Islandora error');
         //drupal_not_found();
         if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
         break;
     }
-    exit();
+    return NULL;
   }
   return $object;
 }
@@ -738,6 +744,9 @@ function si_exhibition_sidora_viewer($object){
   }
   exit();
 }
+/**
+ * Returns the HTML to show the JW player
+ */
 function si_exhibition_jw_player($pid, $file_path, $path_no_last){
   if (strpos($pid, ':') !== FALSE) $pid = urlencode($pid);
   global $base_url;
@@ -876,6 +885,9 @@ function si_exhibition_check_view_permission($object_pid) {
   return false;
   */
 }
+/*
+ * Returns a string of XML format of the object's metadata, getting which content dsid from workbench
+ */
 function si_exhibition_meta_string_for_xslt_by_id($pid){
   $xsl_config = '';
   if (!empty($pid)){
@@ -932,6 +944,10 @@ function si_exhibition_meta_string_for_xslt_by_id($pid){
   }
   $datastream_content = '';
   $object = sidora_obj($pid);
+  if (empty($object)) {
+    watchdog('exhibition', 'si_exhibition_meta_string_for_xslt_by_id bad object: !pid', array('!pid' => $pid));
+    exit();
+  }
   if (empty($specific_meta)){
     foreach($object as $dsid_loop=>$datastream_loop){
       //strip off the <?xml directives if it has any and remove binary data
@@ -1027,7 +1043,6 @@ function si_exhibition_xsl_string($pid){
       $debug_result = ob_get_clean();
       si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
       */
-      //dsm("404'd: $url_to_get");
       return FALSE;
     }
     /*
@@ -2318,6 +2333,9 @@ function si_exhibition_get_printable_tree($tree_pos, $current_path = ''){
   $output .= '</li>';
   return $output;
 }
+/**
+ * Debugging helper, return a stack trace string for use in dsm / dpm / watchdog
+ */
 function exhibition_debug_string_backtrace() {
   ob_start();
   debug_print_backtrace();
@@ -2414,7 +2432,6 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array(), $pat
   if ($visibility_settings_check === FALSE) return NULL;
   if (in_array($pid, $pid_list)){
     //already did this, duplicate found:
-    //dsm('found this pid in the tree already:'.$pid);
     $object = $repo->getObject($pid);
     $to_return['label'] = $object->label;
     $to_return['already_in_tree'] = TRUE;
@@ -2622,7 +2639,14 @@ function si_exhibition_get_obj_datastream_content($pid) {
     header("Content-Disposition: attachment; filename=\"$filename\"");
     print $datastream_content;
     drupal_exit();
-}		
+}
+/*
+ * Deliver content directly from Fedora to the user's browser, streaming it to the browser
+ * if necessary
+ *
+ * The streaming as of this writing 10/25/2017 is exclusively for video, all others are small enough or
+ * streaming is not desired
+ */
 function si_exhibition_deliver_streaming($pid, $dsid = 'OBJ') {
   $repo = tuque_wrapper_get_repository_instance();
   $object = $repo->getObject($pid);
@@ -2792,7 +2816,28 @@ function si_exhibition_get_degradation_level($pid_to_check) {
     return $se['image_degradation'];
   }
   return '2';
-} 
+}
+/*
+ * returns the visibility object obtained from the workbench server, should be of the type:
+ * array(
+ *   'pid' => $pid, // passed in pid
+ *   'label' => 'this has a name',
+ *   'show_name' => 1,
+ *   ...
+ *   'children' => array(
+ *     array(
+ *       'pid' => $to_check_pid, // passed in pid
+ *       'label' => 'this has a name',
+ *       'show_name' => 1,
+ *       ...
+ *     ),
+ *     array( ... )
+ *   ...
+ *   )
+ * $pid - pid that is the one we want to see the children for
+ * 
+ * $path_to_pid - only pass in if it can't be obtained through normal means of getting it via the URL (unlikely)
+ */
 function si_exhibition_get_visibility_tree_children($pid = NULL,$path_to_pid = NULL) {
   if ($pid === NULL) {
     $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
@@ -2803,10 +2848,14 @@ function si_exhibition_get_visibility_tree_children($pid = NULL,$path_to_pid = N
   if ($path_to_pid == NULL) {
     $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
     if (!empty($parent_pid_path)){
+      // We want the pid path to END ON the pid passed in, we assume no circular tree for exhibition
+      while ($parent_pid_path[sizeof($parent_pid_path) - 1] != $pid) {
+        array_pop($parent_pid_path);
+      }
       $path_to_pid = implode('_',$parent_pid_path);
-     }
-   }	
-   if ($path_to_pid == '') $path_to_pid = $pid; 	
+    }
+  }
+  if ($path_to_pid == '') $path_to_pid = $pid; 	
   $url_to_get = variable_get('si_exhibition_visibility_info_url', '');
   $url_to_get = si_exhibition_get_optimized_url($url_to_get,'json_visibility_children') . urlencode($path_to_pid);
   watchdog("exhibition",'si_exhibition_get_visibility_tree_children: url to get'.$url_to_get);
