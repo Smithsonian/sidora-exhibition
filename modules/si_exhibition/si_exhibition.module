@@ -970,19 +970,27 @@ function si_exhibition_meta_string_for_xslt_by_id($pid){
  */
 function si_exhibition_custom_url($cu) {
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
-  if ($cu == 'test')  {
-    var_dump( si_exhibition_get_visibility_tree(''));
-    var_dump(si_exhibition_get_pid_path_to_showing_concept());
-    print '<a href="./si:valid?path=si:1,h:2,y:3">go</a> ';
-    print '<a href="./download">nogo</a>';
-    drupal_exit();
-  }
-  $url =
+  $url_to_get =
     variable_get('si_exhibition_data_url', '').
     'custom_url'.'/'.
     $cu;
-  $my_pid = file_get_contents( $url  );
-  drupal_goto('fedora/repository/'.$my_pid);
+  $ch = curl_init();
+  $timeout = 60;
+  curl_setopt($ch, CURLOPT_URL, $url_to_get);//.'&time='.time());
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+  curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
+  curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false); //BBB TODO REMOVE
+  curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, $timeout);
+  $my_pid = curl_exec($ch);
+
+  if (empty($my_pid)) {
+    watchdog('exhibition', 'Empty pid coming from url:' . $url);
+    print 'Not a valid custom url';
+  }
+  else {
+    drupal_goto('fedora/repository/'.$my_pid);
+  }
 }
 /*
  * Returns the xsl we are using directly to the browser
