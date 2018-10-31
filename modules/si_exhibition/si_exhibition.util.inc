@@ -89,7 +89,25 @@ function si_exhibition_get_visibility_object($to_check_pid, $parent_pid_path = N
   }
   return FALSE;
 }
-
+/**
+ * Returns an object  that contains the children of the item passed in, of the form
+ * array(
+ *   'pid' => $to_check_pid, // passed in pid
+ *   'label' => 'this has a name',
+ *   'show_name' => 1,
+ *   ...
+ *   'children' => array(
+ *     array(
+ *       'pid' => $to_check_pid, // passed in pid
+ *       'label' => 'this has a name',
+ *       'show_name' => 1,
+ *       ...
+ *     ),
+ *     array( ... )
+ *   ...
+ *   )
+ *  )
+ */
 function si_exhibition_get_visibility_object_children($to_check_pid, $parent_pid_path = NULL) {
   if ($parent_pid_path === NULL) {
     // Find where the path of the current concept from the exhibition root
@@ -99,10 +117,8 @@ function si_exhibition_get_visibility_object_children($to_check_pid, $parent_pid
   // Go to that place in the visibility tree
   // Return if the child pid is there
   if (!empty($parent_pid_path)){
-    $path_to_pid = implode('_',$parent_pid_path);
     //watchdog("exhibition",'si_exhibition_get_visibility_object_children: path to pid'.$path_to_pid);
-    $vis_tree = si_exhibition_get_visibility_tree_children($to_check_pid,$path_to_pid);
-    $curr_children = array($vis_tree);
+    $vis_tree = si_exhibition_get_visibility_tree_children($to_check_pid);
     return $vis_tree;
   }
   else {
@@ -129,7 +145,7 @@ function si_exhibition_check_parent_in_tree(array $object_info, $tree_pid) {
      $tree = _si_exhibition_get_pid_tree($tree_pid, null, $tree_pid_list, array($tree_pid));
      if (variable_get('si_exhibition_file_cache', FALSE)) {
        $return_from_write = _si_exhibition_get_pid_tree_to_cache($tree_pid,$tree);
-      watchdog("exhibition",'si_exhibition_check_parent_in_tree, writing to file cache :'.$return_from_write);
+       si_exhibition_debug('si_exhibition_check_parent_in_tree, writing to file cache :'.$return_from_write,NULL,TRUE);
       }	
      }
      else {
@@ -492,12 +508,11 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
   //Start cache check for return
   $cache_name = 'child_resource_info';
   $cache_index = $object_id.'_'.$type.'_'.$sort;
-  watchdog("exhibition",'si_exhibition_get_child_resource_info_by_id, cache_index :'.$cache_index);
+  si_exhibition_debug('si_exhibition_get_child_resource_info_by_id, cache_index :'.$cache_index, NULL,TRUE);
   $to_return = si_exhibition_cache($cache_name,$cache_index);
   if (!empty($to_return)){ return $to_return; }
   si_exhibition_cron_cache(__FUNCTION__, func_get_args());
   //End cache
-
   $resource_types = array(
     'all' => array(),
     'images' => array('si:imageCModel', 'si:generalImageCModel'),
@@ -515,7 +530,7 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
   $parent_path = si_exhibition_get_pid_path_to_showing_concept();
   array_pop($parent_path); //Remove the current concept from the "parents" list
   $vis_obj = si_exhibition_get_visibility_object_children($object_id);
-  watchdog("exhibition",'si_exhibition_get_child_resource_info_by_id for :'.$object_id);
+  si_exhibition_debug('si_exhibition_get_child_resource_info_by_id for :'.$object_id, NULL,TRUE);
 	//Walk through the visibility pulling out the type and number of items asked for
   $count_so_far = 0;
   $resources = array();
@@ -523,6 +538,11 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
     //The visibility object needs to exist to pull info from it
     return NULL;
   }
+  si_exhibition_debug('si_exhibition_get_child_resource_info_by_id vis_obj:'. json_encode($vis_obj), NULL,TRUE);
+  // There are apparently multiple ways this is set up -- which is bad, for two reasons: Harder to maintain and can get to grandchild skipping a parent
+  // The ways that they are set up:
+  // One way is that we have the children as a array under vis_obj with key children
+  // The other way is that we have the child directly in vis_obj
   if (array_key_exists('children', $vis_obj)) {
     foreach($vis_obj['children'] as $child_vis_obj) {
       if (
@@ -549,28 +569,8 @@ function si_exhibition_get_child_resource_info_by_id($object_id, $type = 'all', 
       }
     }
   }
-
+  si_exhibition_debug('si_exhibition_get_child_resource_info_by_id resources, prefilter:'. json_encode($resources),NULL,TRUE);
   $resources =  array_filter($resources, 'si_exhibition_check_object_info_accessible'); //BBB Security changes will necessitate this being used
-  /*
-  $visible_child_list = array();
-  if (!empty($vis_obj) && !empty($vis_obj['children'])) {
-    //Fill up the list of items that the current concept has as visible children
-    foreach($vis_obj['children'] as $child_vis_obj) {
-      if (
-          !empty($child_vis_obj['pid']) && 
-          !empty($child_vis_obj['show_name']) && 
-          !empty($child_vis_obj['type']) && 
-          ($child_vis_obj['type'] == 'resource')
-         ) {
-        $visible_child_list[] = $child_vis_obj['pid'];
-      }
-    }
-  }
-  //Only return resources that should be visible
-  $resources = array_filter($resources, function($elem) use($visible_child_list){
-     return in_array($elem['pid'],$visible_child_list);
-  });
-  */
   $to_return = $resources;
   return si_exhibition_cache($cache_name, $cache_index, $to_return);
 }

@@ -340,7 +340,7 @@ function theme_si_exhibition_parent_concepts($vars) {
 }
 */
 function theme_si_exhibition_parent_concepts($vars) {
-  watchdog("exhibition",'theme_si_exhibition_parent_concepts, pid:'.$vars['pid']);
+  si_exhibition_debug('theme_si_exhibition_parent_concepts, pid:'.$vars['pid']);
   $pid = $vars['pid'];
   global $main_path;
   $full_path = (isset($_GET['path']) ? $_GET['path'] : '');
@@ -385,7 +385,7 @@ function theme_si_exhibition_parent_concepts($vars) {
  * Displays a list of child concepts links along with their number of children.
  */
 function theme_si_exhibition_child_concepts($vars){
-  watchdog("exhibition",'theme_si_exhibition_child_concepts, pid:'.$vars['pid']);
+  si_exhibition_debug('theme_si_exhibition_child_concepts, pid:'.$vars['pid']);
   $pid = $vars['pid'];
   global $main_path;
   $header ='<h3>' . t('Child concepts') . '</h3>';
@@ -439,7 +439,7 @@ function HandleXmlError($errno, $errstr, $errfile, $errline)
  */
 function theme_si_exhibition_metadata_xmls($vars){
   $pid = $vars['pid'];
-  watchdog("exhibition",'in theme metadata, pid:'.$pid);
+  si_exhibition_debug('in theme metadata, pid:'.$pid);
   if (variable_get('si_exhibition_anonymous_only', FALSE)){
     if (!si_exhibition_check_view_permission($pid)){
       si_exhibition_debug('view_permission was false');
