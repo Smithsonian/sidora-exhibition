@@ -93,6 +93,7 @@ function sidora_update_relationship_choose_exit($uri, $predicate, $recipient, $r
         if (!isset($description)) { // Couldn't reach the repository.
           drupal_set_message(t('The Fedora repository server is currently unavailable. Please contact the site administrator.'), 'error', FALSE);
         }
+        watchdog('si_exhibition_util', '404 from Fedora, returning drupal_not_found');
         drupal_not_found();
         break;
       case '401':
