@@ -502,14 +502,14 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
   if (variable_get('si_exhibition_anonymous_only', FALSE)){
     if (!si_exhibition_check_view_permission($pid)){
       watchdog('exhibition', 'si_exhibition_check_view_permission for:'.$pid.' was false');
-      si_exhibition_debug('View permission false:'.$pid);
+      si_exhibition_debug('<h1>View permission false, STOPPING OUTPUT:'.$pid.'</h1>');
       if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
       return MENU_NOT_FOUND;
     }
   }
   if (!_si_show_exhibition()){
     watchdog('exhibition', '_si_show_exhibition for:'.$pid.' was false');
-    si_exhibition_debug('Show exhibition explicitly false:'.$pid);
+    si_exhibition_debug('<h1>Show exhibition explicitly false, STOPPING OUTPUT:'.$pid.'</h1>');
     if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
     return MENU_NOT_FOUND; //drupal_not_found();
   }
@@ -518,7 +518,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
   $xsl_config = si_exhibition_forward_direct_open_access(array('xsl_config', $pid), TRUE, FALSE);
   $file_extension = si_exhibition_forward_direct_open_access(array('file_extension', $pid), TRUE, FALSE);
   if (empty($xsl_config) && empty($file_extension)){
-    si_exhibition_debug('xsl_config or file_extention empty:'.$pid);
+    si_exhibition_debug('<h1>xsl_config or file_extention empty, STOPPING OUTPUT:'.$pid.'</h1>');
     if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
     return MENU_NOT_FOUND;
   }
@@ -528,7 +528,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     //RELS-EXT should never be able to be downloaded.  It contains too much structural information that may need
     //to be hidden
     if ($dsid == 'RELS-EXT') {
-      si_exhibition_debug('Not allowed to use viewer directly on RELS-EXT datastream:'.$pid);
+      si_exhibition_debug('<h1>Not allowed to use viewer directly on RELS-EXT datastream, STOPPING OUTPUT:'.$pid.'</h1>');
       if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
       return MENU_NOT_FOUND;
     }
@@ -548,7 +548,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
       if ($viewer_allowed_for_obj) {
       }
       else {
-        si_exhibition_debug('Not allowed to use viewer directly on OBJ datastream for this object:'.$pid);
+        si_exhibition_debug('<h1>Not allowed to use viewer directly on OBJ datastream for this object, STOPPING OUTPUT:'.$pid.'</h1>');
         if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
         return MENU_NOT_FOUND;
       }
@@ -562,7 +562,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     }
     $vis_obj = si_exhibition_get_visibility_object($pid,$parent_pid_path);
      if (empty($vis_obj) || empty($vis_obj['show_preview'])) {
-      si_exhibition_debug('Visibility object empty or show_preview was empty');
+      si_exhibition_debug('<h1>Visibility object empty or show_preview was empty, STOPPING OUTPUT</h1>');
       if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
       //  print $pid;
       //  var_dump($vis_obj);
@@ -575,7 +575,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
       //This is the datastream that is considered for "show meta" so should only be allowed if show meta is allowed
       //In order to get through to show the direct meta, the setting must be "show_meta" (this code) and "show_preview" (lines above) as true
       if (empty($vis_obj['show_meta']) && ((string)$dsid === (string)$specific_meta)) {
-        si_exhibition_debug('Show meta is not true, and the datastream requested is considered the metadata datastream:'.$pid.' '.$dsid);
+        si_exhibition_debug('<h1>Show meta is not true, and the datastream requested is considered the metadata datastream, STOPPING OUTPUT:'.$pid.' '.$dsid.'</h1>');
         if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
         return MENU_NOT_FOUND;
       }
@@ -607,6 +607,7 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
     return theme('si_exhibition_object', array('object'=>$object));
     drupal_exit();
   }else{
+    si_exhibition_debug('<h1>Object returned from Fedora is empty, STOPPING OUTPUT:'.$pid.'</h1>');
     return MENU_NOT_FOUND;
   }
 }
