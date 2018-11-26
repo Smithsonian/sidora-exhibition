@@ -199,10 +199,13 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   $view = '';
   if ($resource['visibility']['show_preview']){ //Do not show the "preview" thumbnail & link if preview is off
     $available_view = '';
-    if (is_array($display['view'])) foreach($display['view'] as $curr_view) if (array_search($curr_view, $resource['datastreams']) !== FALSE) $available_view = $curr_view;
+    if (!empty($display['view']) && is_array($display['view'])) 
+      foreach($display['view'] as $curr_view) 
+        if (array_search($curr_view, $resource['datastreams']) !== FALSE) 
+          $available_view = $curr_view;
     if (!empty($available_view)){ $display['view'] = $available_view;  }
     $preview = '';
-    if (array_search($display['view'], $resource['datastreams']) !== FALSE) {
+    if (!empty($display['view']) && array_search($display['view'], $resource['datastreams']) !== FALSE) {
 	//$thumbnail_url = url("fedora/repository/{$resource['pid']}/TN/tn.jpg")."?path=".implode(',',si_exhibition_get_pid_path_to_showing_concept());
 	$thumbnail_url = url("si/exhibition/tn/{$resource['pid']}/TN/tn.jpg")."?path=".implode(',',si_exhibition_get_pid_path_to_showing_concept());
       if (array_search('si:datasetCModel', $resource['models']) !== FALSE) {
@@ -239,13 +242,15 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   }
 
   // Type
-  list($icon, $type) = $display['type'];
-  $type = "<div class='r-icon $icon title='$type'>$type</div>";
+  if (!empty($display['type'])){
+    list($icon, $type) = $display['type'];
+    $type = "<div class='r-icon $icon title='$type'>$type</div>";
+  }
   // Download
   $download = '';
 
   $available_dsid = '';
-  if (is_array($display['dsid'])){
+  if (!empty($display['dsid']) && is_array($display['dsid'])){
     foreach($display['dsid'] as $curr_dsid) {
       if (array_search($curr_dsid, $resource['datastreams']) !== FALSE) {
         $available_dsid = $curr_dsid;
@@ -254,7 +259,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   }
   if (!empty($available_dsid)){ $display['dsid'] = $available_dsid;  }
 
-  if (array_search($display['dsid'], $resource['datastreams']) !== FALSE) {
+  if (!empty($display['dsid']) && array_search($display['dsid'], $resource['datastreams']) !== FALSE) {
 		$download = l('Download', 'fedora/download/' . $resource['pid'], array('class'=> $display['class']));
 	}
 
