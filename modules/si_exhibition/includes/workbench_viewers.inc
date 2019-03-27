@@ -16,7 +16,6 @@ function sidora_view_openseadragon($pid, $dsid, $version='0'){
   print "\r\n".'        <script>                                                                                            ';
   print "\r\n".'          <!-- create the tile source -->                                                                   ';
 //  print "\r\n".'          var service = "/adore-djatoka/resolver";';
-  //print "\r\n".'          var service = "'.$local_resolver.$pid.'/'.$dsid.'/'.$version.'?t='.time().'";';
   print "\r\n".'          var service = "'.$local_resolver.$pid.'/'.$dsid.'/'.$version.'";';
   print "\r\n".'          var id = "{replacer}";';  //replacer is a value that is hard-coded to be replaced with the proper id in the osd_proxy function
   print "\r\n".'          var settings = {tileSize: 256, tileOverlap: 0};                                                   ';
@@ -26,7 +25,6 @@ function sidora_view_openseadragon($pid, $dsid, $version='0'){
   print "\r\n".'            id: "page-image",                                                                               ';
   print "\r\n".'            prefixUrl: "'.$osd_js_path.'openseadragon/images/",';
   print "\r\n".'            showNavigator: true,                                                                            ';
-//  print "\r\n".'            debugMode: '.time().',                                                                            ';
   print "\r\n".'            debugMode: false,                                                                                ';
   print "\r\n".'            tileSources: [tileSource],                                                                      ';
   print "\r\n".'            showRotationControl: true                                                                       ';
@@ -65,18 +63,35 @@ function sidora_view_degraded_img($pid, $dsid, $version='0', $level='2'){
   print "\r\n".'</html>                                                                                                     ';
   drupal_exit();
 }
-
+/**
+ * Pull the number of header rows from SIDORA datastream from a codebook
+ * @param codebook_obj - Tuque object that represents the codebook
+ * @return number of header rows
+ *         NULL if cannot determine the number of header rows (old SIDORA datastream or no SIDORA datastream)
+ */
+function sidora_codebook_pull_num_header_rows($codebook_obj) {
+  $num_header_rows = NULL;
+  if (!empty($codebook_obj['SIDORA'])){
+    $doc = new DOMDocument();
+    $content = $codebook_obj['SIDORA']->content;
+    $doc->loadXML($content);
+    $num_header_rows_elements = $doc->getElementsByTagName('num_header_rows');
+    foreach($num_header_rows_elements as $element){
+      $num_header_rows = $element->nodeValue;
+    }
+  }
+  return $num_header_rows;
+}
 /*
  * Returns the full view for the phpexcelreader plus javascript
  */
 function sidora_tabular_view_phpexcelreader($pid,$dsid = 'OBJ'){
   require dirname(__FILE__).'/utils.inc';
-  ob_start();
-  print "Starting tabular viewer with pid:".$pid." and dsid:".$dsid;
-  $debug_result = ob_get_clean();
-  si_exhibition_debug($debug_result);
-
   $object = sidora_obj($pid);
+  if (empty($object)) {
+    watchdog('sidora_viewer','Could not find in Fedora for viewer: !pid', array('!pid' => $pid));
+    return;
+  }
   $datastream_content = $object[$dsid]->content;
   $datastream = $object[$dsid];
   $mime_type = (empty($datastream))?'text/xml':$datastream->mimeType;
@@ -92,19 +107,7 @@ function sidora_tabular_view_phpexcelreader($pid,$dsid = 'OBJ'){
   $file->filename = $filename;
   $file->filemime = $mime_type;
   $file->status = 0; // Temporary file.
-
-  ob_start();
-  print "About to save the first file:". file_directory_temp() . '/'.$filename;
-  $debug_result = ob_get_clean();
-  si_exhibition_debug($debug_result);
-
   file_unmanaged_save_data($datastream_content, file_directory_temp() . '/'.$filename, FILE_EXISTS_REPLACE); 
-
-  ob_start();
-  print "Saved first file:". file_directory_temp() . '/'.$filename;
-  $debug_result = ob_get_clean();
-  si_exhibition_debug($debug_result);
-
   $temp = file_directory_temp();
   $rels = $object->relationships->get(FEDORA_RELS_EXT_URI, 'hasCodebook');
   global $base_url;
@@ -135,231 +138,179 @@ function sidora_tabular_view_phpexcelreader($pid,$dsid = 'OBJ'){
     });
   </script>
 ';
-
-  ob_start();
-  print "Echo 1 to browser complete";
-  $debug_result = ob_get_clean();
-  si_exhibition_debug($debug_result);
-
+  $codebook_headers_exist = FALSE;
+  $num_header_lines = NULL;
   $use_codebook_headers = '';
-
-  ob_start();
-  print "Checking RELS";
-  $debug_result = ob_get_clean();
-  si_exhibition_debug($debug_result);
-
-
   if (!empty($rels)){
-
-    ob_start();
-    print "RELS is true";
-    $debug_result = ob_get_clean();
-    si_exhibition_debug($debug_result);
-
     $codebook_pid = ($rels[0]['object']['value']);
     $codebook_obj = sidora_obj($codebook_pid);
-    if (!empty($codebook_obj['DDI'])){
-
-      ob_start();
-      print "DDI is true";
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-
-      $doc = new DOMDocument();
-      $content = $codebook_obj['DDI']->content;
-      $doc->loadXML($content);
-
-      ob_start();
-      print "DDI XML loaded";
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-
-      $label_elements = $doc->getElementsByTagName('label');
-      $labels = array(); 
-
-      ob_start();
-      print "DDI XML labels";
-      var_dump ($label_elements);
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-
-      foreach($label_elements as $element){
-        $labels[] = $element->nodeValue;
-      }
-      $use_codebook_headers = '<br/><input type="checkbox" id="useCodebookHeaders" />Use Codebook Headers';
-      echo '
-  <script>
-    jQuery(document).ready(function(){
-      window.tablesInfo = {};
-      tablesInfo.originalHasHeader = [];
-      tablesInfo.codebookLabels = [';
-      foreach($labels as $i => $label){
-        if ($i > 0) echo ',';
-        echo '"'.$label.'"';
-      }
-      echo '
-      ];
-      jQuery("#hasHeader th").each(function(index,value){
-        tablesInfo.originalHasHeader.push(jQuery(value).text());
+    if (!empty($codebook_obj)) {
+      $num_header_lines = sidora_codebook_pull_num_header_rows($codebook_obj);
+      if (!empty($codebook_obj['DDI'])){
+        $doc = new DOMDocument();
+        $content = $codebook_obj['DDI']->content;
+        $doc->loadXML($content);
+        $label_elements = $doc->getElementsByTagName('label');
+        $labels = array(); 
+        foreach($label_elements as $element){
+          $codebook_headers_exist = TRUE;
+          $labels[] = $element->nodeValue;
+        }
+        $use_codebook_headers = '<br/><input type="checkbox" id="useCodebookHeaders" />Use Codebook Headers';
+        echo '
+    <script>
+      jQuery(document).ready(function(){
+        window.tablesInfo = {};
+        tablesInfo.originalHasHeader = [];
+        tablesInfo.codebookLabels = [';
+        foreach($labels as $i => $label){
+          if ($i > 0) echo ',';
+          echo '"'.$label.'"';
+        }
+        echo '
+        ];
+        jQuery("#hasHeader th").each(function(index,value){
+          tablesInfo.originalHasHeader.push(jQuery(value).text());
+        });
+        jQuery("#useCodebookHeaders").click(function(){
+          if (jQuery("#useCodebookHeaders").prop("checked")){
+            jQuery("#noHeader th").each(function(index,value){
+              if (tablesInfo.codebookLabels.length > index){
+                value.innerHTML = tablesInfo.codebookLabels[index];
+              }else{
+                value.innerHTML = "";
+              }
+            });
+            jQuery("#hasHeader th").each(function(index,value){
+              if (tablesInfo.codebookLabels.length > index){
+                value.innerHTML = tablesInfo.codebookLabels[index];
+              }else{
+                value.innerHTML = "";
+              }
+            });
+          }else{
+            jQuery("#noHeader th").each(function(index,value){
+              value.innerHTML = "";
+            });
+            jQuery("#hasHeader th").each(function(index,value){
+              if (tablesInfo.originalHasHeader.length > index){
+                value.innerHTML = tablesInfo.originalHasHeader[index];
+              }else{
+                value.innerHTML = "";
+              }
+            });
+          } 
+        });
       });
-      jQuery("#useCodebookHeaders").click(function(){
-        if (jQuery("#useCodebookHeaders").prop("checked")){
-          jQuery("#noHeader th").each(function(index,value){
-            if (tablesInfo.codebookLabels.length > index){
-              value.innerHTML = tablesInfo.codebookLabels[index];
-            }else{
-              value.innerHTML = "";
-            }
-          });
-          jQuery("#hasHeader th").each(function(index,value){
-            if (tablesInfo.codebookLabels.length > index){
-              value.innerHTML = tablesInfo.codebookLabels[index];
-            }else{
-              value.innerHTML = "";
-            }
-          });
-        }else{
-          jQuery("#noHeader th").each(function(index,value){
-            value.innerHTML = "";
-          });
-          jQuery("#hasHeader th").each(function(index,value){
-            if (tablesInfo.originalHasHeader.length > index){
-              value.innerHTML = tablesInfo.originalHasHeader[index];
-            }else{
-              value.innerHTML = "";
-            }
-          });
-        } 
-      });
-    });
-  </script>
-';
+    </script>
+  ';
+      }
     }
   }
-
-      ob_start();
-      print "Echo 2 to browser complete";
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-
   echo '
 </head>
 <body style="background:white;margin:20px;">
 ';
-  echo '<input type="checkbox" id="showHeaderTable" />Has Header Row';
+  if ($num_header_lines === NULL && $codebook_headers_exist) $num_header_lines = 1;
+  if (empty($num_header_lines)) $num_header_lines = 1;
+  echo '<input type="checkbox" id="showHeaderTable" />';
+  if ($num_header_lines == 1) {
+    echo t('Skip header row');
+  }
+  elseif ($num_header_lines > 1) {
+    echo t('Skip header rows (%num_headers)',array('%num_headers'=>$num_header_lines));
+  }
   echo $use_codebook_headers;
-
-      ob_start();
-      print "Tabular 1 outputting...".$temp.'/'.$filename;
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-
-  echo sidora_tabular_view_phpexcelreader_html($temp.'/'.$filename, TRUE, 'hasHeader');
-
-      ob_start();
-      print "Tabular 2 outputting...".$temp.'/'.$filename;
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-
-  echo sidora_tabular_view_phpexcelreader_html($temp.'/'.$filename, FALSE, 'noHeader');
+ 
+  echo sidora_tabular_view_phpexcelreader_html($temp.'/'.$filename, $num_header_lines, 'hasHeader');
+  echo sidora_tabular_view_phpexcelreader_html($temp.'/'.$filename, 0, 'noHeader');
   echo '</body>
 </html>';
-
-      ob_start();
-      print "Echo final to browser complete";
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-
   drupal_exit();
 }
+/*
+ * Returns the cell value properly formatted as a string
+ * This will allow use to control the date format if needed
+ */
+function sidora_tabular_view_phpexcelreader_html_string($objPHPExcel, $cell) {
+  if(PHPExcel_Shared_Date::isDateTime($cell)) {
+    $code = $objPHPExcel->getActiveSheet()->getStyle($cell->getCoordinate())->getNumberFormat()->getFormatCode();
+    if ($code == 'mm-dd-yy'){
+       //So, getting into this a bit here's the problem
+       //Excel saves "general" dates as format mm-dd-yy
+       //but it shows them in program as MM/DD/YYYY
+       //AND it also stores text with the standard mm-dd-yy format
+       //PHPExcel still considers this text to return true from isDateTime, but knows when
+       //it is formatting not to try to use it as a date.
+       $our_output_format = 'n/j/Y';
+       $their_output_format = 'm-d-y';
+       //The cell value coming back as a date is 00:00:00 and then when
+       //formatting happens will take it to the previous day
+       //so bump up a day when we are dealing with pure date and no time
+       $date_number = PHPExcel_Shared_Date::ExcelToPHP($cell->getValue()+1);
+       $their_output = date($their_output_format, $date_number);
+       $our_output = date($our_output_format, $date_number);
+       $their_formatted = $cell->getFormattedValue();
+       $to_return = $their_formatted;
+       if ($their_formatted == $their_output) {
+         $to_return = $our_output;
+       }
+       return $to_return;
 
+    }
+    return $cell->getFormattedValue();
+  }
+  return $cell->getFormattedValue();
+}
 /*
  * Returns the pure HTML table based on the given filename
  */
-function sidora_tabular_view_phpexcelreader_html($filename, $first_line_header = TRUE, $table_id = ''){
-
-  $to_return = '';
-try{
-      ob_start();
-      print "Loading PHPExcel IOFactory";
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-
-  
+function sidora_tabular_view_phpexcelreader_html($filename, $number_header_lines = 1, $table_id = ''){
   require_once(libraries_get_path('PHPExcel') . '/Classes/PHPExcel/IOFactory.php');
-
-      ob_start();
-      print "Loading PHPExcel File:".$filename;
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-
-  $objPHPExcel = PHPExcel_IOFactory::load($filename);
-
-      ob_start();
-      print "Getting active sheet of file:".$filename;
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-
+  $objReader = PHPExcel_IOFactory::createReaderForFile($filename);
+  $objPHPExcel = $objReader->load($filename);
   $worksheet = $objPHPExcel->getActiveSheet();
-  $table_header = '<thead><tr>';
+  $table_header = "\n" . '<thead><tr>';
   $table_data = '<tbody>';
-  $is_first = TRUE;
-  $count = 0;
-
-      ob_start();
-      print "Iterating rows...".$filename;
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-
+  $num_lines_so_far = 0;
+  //remove $first_line_header $is_first
   foreach ($worksheet->getRowIterator() as $row) {
-  	if (!$is_first || !$first_line_header){
-      $table_data .= '<tr>';// class="'.(count%2==0)?'odd':'even'.'">';
+  	if ($num_lines_so_far >= $number_header_lines){
+      $table_data .= "\n".'<tr>';
+      //$table_data .= "\n".'<tr numLinesSoFar="'.$num_lines_so_far.'" nhl="'.$number_header_lines.'">';
     }
     $cellIterator = $row->getCellIterator();
   	$cellIterator->setIterateOnlyExistingCells(false); // Loop all cells, even if it is not set
     foreach ($cellIterator as $cell) {
-      if ($is_first){
-        if ($first_line_header){
-          $table_header .= '<th>' . $cell->getValue() . '</th>';
-        }else{
-          $table_header .= '<th></th>'; 
+      if ($num_lines_so_far == $number_header_lines - 1) {
+        if ($number_header_lines != 0){
+          $table_header .= '<th>' . sidora_tabular_view_phpexcelreader_html_string($objPHPExcel, $cell) . '</th>';
         }
       }
-      if (!is_null($cell) && !($is_first && $first_line_header)) {
-        $table_data .= '<td>' . $cell->getValue() . '</td>';
+      if ($num_lines_so_far == 0 && $number_header_lines == 0) {
+        $table_header .= '<th></th>';
+      }
+      if ($num_lines_so_far >= $number_header_lines) {
+        if (!is_null($cell)) {
+          $table_data .= '<td>' . sidora_tabular_view_phpexcelreader_html_string($objPHPExcel, $cell) . '</td>';
+        }
+        else {
+          $table_data .= '<td></td>';
+        }
       }
     }
-  	if (!$is_first || !$first_line_header){
-		  $table_data .= '</tr>';
+  	if ($num_lines_so_far >= $number_header_lines){
+      $table_data .= '</tr>';
     }
-    $is_first = FALSE;
+    $num_lines_so_far++;
   }
-
-      ob_start();
-      print "Row iterating complete.".$filename;
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-
-  $table_header .= '</tr></thead>';
-  $table_data .= '</tbody>';
+  $table_header .= '</tr></thead>'."\n";
+  $table_data .= '</tbody>'."\n";
 
   $to_return = '<table class="display" id="'.$table_id.'">';
   $to_return .= $table_header;
   $to_return .= $table_data;
   $to_return .= '</table>';
-
-      ob_start();
-      print "Returning full html table.".$filename;
-      $debug_result = ob_get_clean();
-      si_exhibition_debug($debug_result);
-}catch(Exception $e){
-      ob_start();
-      print "\n<br>\n";
-      print $e->getMessage();
-      print "\n<br>\n";
-      var_dump($e);
-      $debug_result = ob_get_clean();
-      watchdog("PHPExcelViewer",$debug_result);
-}
   return $to_return;
 }
+

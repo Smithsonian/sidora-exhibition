@@ -329,14 +329,16 @@ function _si_current_pid_to_show() {
 
 function _si_show_exhibition(){
   $pid_on_url = arg(2); 
-  watchdog("exhibition",'_si_show_exhibition, checking for :'.$pid_on_url);
+  si_exhibition_debug('_si_show_exhibition, checking for :'.$pid_on_url, NULL,TRUE);
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $path = filter_input(INPUT_GET, 'path');
   //Start cache check for return
   $cache_name = 'show_exhibition';
   $cache_index = $pid_on_url.'_'.$path;
   $to_return = si_exhibition_cache($cache_name,$cache_index);
-	if (!empty($to_return)){ return $to_return; }
+  if (!empty($to_return)){
+    return $to_return;
+  }
   si_exhibition_cron_cache(__FUNCTION__, func_get_args());
   //End cache
   // $bad_path and $bad_path_set are just for this function if caching is turned off
@@ -350,7 +352,7 @@ function _si_show_exhibition(){
     if (!empty($path_list[0])){
       $path_to_pid = array($path_list[0]);
       $tree = '';
-      watchdog('exhibition','_si_show_exhibition, exhibition file cache is :'.variable_get('si_exhibition_file_cache', FALSE));
+      si_exhibition_debug('_si_show_exhibition, exhibition file cache is :'.variable_get('si_exhibition_file_cache', FALSE), NULL,TRUE);
       if (variable_get('si_exhibition_file_cache', FALSE)) {
         $tree = _si_exhibition_get_pid_tree_from_cache($path_list[0]);
       }	
@@ -358,7 +360,7 @@ function _si_show_exhibition(){
         $tree = _si_exhibition_get_pid_tree($path_list[0], null, $tree_pid_list,$path_to_pid);
 	if (variable_get('si_exhibition_file_cache', FALSE)) {
 	  $return_from_write = _si_exhibition_get_pid_tree_to_cache($path_list[0],$tree);
-          watchdog("exhibition",'_si_show_exhibition, writing to file cache :'.$return_from_write);
+          si_exhibition_debug('_si_show_exhibition, writing to file cache :'.$return_from_write, NULL,TRUE);
 	}	
       }
       else {
@@ -368,6 +370,8 @@ function _si_show_exhibition(){
         $bad_path = true;
       }
     }
+    si_exhibition_debug('_si_show_exhibition path_list:' . json_encode($path_list), NULL, TRUE);
+    si_exhibition_debug('_si_show_exhibition tree_pid_list:' . json_encode($tree_pid_list), NULL, TRUE);
     if ($bad_path) {
       try{
       // See if this is a resource of the final item in the path
@@ -375,6 +379,7 @@ function _si_show_exhibition(){
       if (is_array($pid_array_values)){
         $possible_parent_pid = $pid_array_values[0];
         $children = si_exhibition_get_child_resource_info_by_id($possible_parent_pid);
+        si_exhibition_debug("_si_show_exhibition child pids for:" . $possible_parent_pid . " are:" . json_encode($children), NULL, TRUE);
         if (is_array($children)) {
           foreach($children as $child) {
             if ($child['pid'] == $pid_on_url) {
@@ -438,6 +443,10 @@ function si_exhibition_get_tn($pid = NULL, $dsid  = NULL) {
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $pid = isset($pid) ? $pid : variable_get('fedora_repository_pid', 'si:root');
   $object = sidora_obj($pid);
+  if (empty($object)) {
+    watchdog('exhibition', 'si_exhibition_get_tn bad object: !pid', array('!pid' => $pid));
+    exit();
+  }
   drupal_add_css(drupal_get_path('module', 'si_exhibition') . '/css/si-exhibition.css');
   $jstreepath = variable_get('sidora_js_lib_location_jstree', '');
   drupal_add_css($jstreepath . 'themes/default/style.min.css', array('type' => 'external'));
@@ -483,6 +492,10 @@ function si_exhibition($pid = NULL, $dsid = NULL) {
   require_once ( dirname(__FILE__) . '/si_exhibition.util.inc');
   $pid = isset($pid) ? $pid : variable_get('fedora_repository_pid', 'si:root');
   $object = sidora_obj($pid);
+  if (empty($object)) {
+    watchdog('exhibition', 'si_exhibition bad object: !pid', array('!pid' => $pid));
+    exit();
+  }
   drupal_add_css(drupal_get_path('module', 'si_exhibition') . '/css/si-exhibition.css');
   $jstreepath = variable_get('sidora_js_lib_location_jstree', '');
   drupal_add_css($jstreepath . 'themes/default/style.min.css', array('type' => 'external'));
@@ -617,7 +630,6 @@ function sidora_obj($pid){
         var_dump($description);
         $desc_as_string = ob_get_clean();
         watchdog('exhibition', '404 error getting pid:'.$pid.'. Trying to get Fedora description, it described itself:'. $desc_as_string);
-        //dsm('Could not reach Fedora');
         //drupal_not_found();
         if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
         break;
@@ -639,12 +651,11 @@ function sidora_obj($pid){
           '%line' => $caller['line']
         );
         watchdog('si_exhibition', $message, $variables, WATCHDOG_ERROR, NULL);
-        //dsm('Islandora error');
         //drupal_not_found();
         if ($GLOBALS['print_debug_lines']) print __LINE__ . ' of ' . __FILE__;
         break;
     }
-    exit();
+    return NULL;
   }
   return $object;
 }
@@ -734,6 +745,9 @@ function si_exhibition_sidora_viewer($object){
   }
   exit();
 }
+/**
+ * Returns the HTML to show the JW player
+ */
 function si_exhibition_jw_player($pid, $file_path, $path_no_last){
   if (strpos($pid, ':') !== FALSE) $pid = urlencode($pid);
   global $base_url;
@@ -872,6 +886,9 @@ function si_exhibition_check_view_permission($object_pid) {
   return false;
   */
 }
+/*
+ * Returns a string of XML format of the object's metadata, getting which content dsid from workbench
+ */
 function si_exhibition_meta_string_for_xslt_by_id($pid){
   $xsl_config = '';
   if (!empty($pid)){
@@ -928,6 +945,10 @@ function si_exhibition_meta_string_for_xslt_by_id($pid){
   }
   $datastream_content = '';
   $object = sidora_obj($pid);
+  if (empty($object)) {
+    watchdog('exhibition', 'si_exhibition_meta_string_for_xslt_by_id bad object: !pid', array('!pid' => $pid));
+    exit();
+  }
   if (empty($specific_meta)){
     foreach($object as $dsid_loop=>$datastream_loop){
       //strip off the <?xml directives if it has any and remove binary data
@@ -1031,7 +1052,6 @@ function si_exhibition_xsl_string($pid){
       $debug_result = ob_get_clean();
       si_exhibition_sidora_debug($debug_result, curl_getinfo($ch));
       */
-      //dsm("404'd: $url_to_get");
       return FALSE;
     }
     /*
@@ -2208,19 +2228,19 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
     //if we have a path, make sure we can access that path
     $tree = NULL;
     $tree_pid_list = array();
-    watchdog('exhibition','si_exhibition_get_item_display_config, exhibition file cache is :'.variable_get('si_exhibition_file_cache', FALSE));
+    si_exhibition_debug('si_exhibition_get_item_display_config, exhibition file cache is :'.variable_get('si_exhibition_file_cache', FALSE), NULL,TRUE);
     if (empty($path)){
       $path_to_pid = array($pid_on_url);
       $tree = '';
       if (variable_get('si_exhibition_file_cache', FALSE)) {
-        watchdog('exhibition','si_exhibition_get_item_display_config, Getting pid tree from cache');
+        si_exhibition_debug('si_exhibition_get_item_display_config, Getting pid tree from cache', NULL,TRUE);
         $tree = _si_exhibition_get_pid_tree_from_cache($pid_on_url);
       }
       if (empty($tree)) {
        $tree = _si_exhibition_get_pid_tree($pid_on_url, null, $tree_pid_list, $path_to_pid);
 	if (variable_get('si_exhibition_file_cache', FALSE)) {
 	  $return_from_write = _si_exhibition_get_pid_tree_to_cache($pid_on_url,$tree);
-          watchdog("exhibition",'si_exhibition_get_item_display_config, writing to file cache :'.$return_from_write);
+          si_exhibition_debug('si_exhibition_get_item_display_config, writing to file cache :'.$return_from_write, NULL,TRUE);
 	}	
       }
       else {
@@ -2232,14 +2252,14 @@ function si_exhibition_get_item_display_config($pid,$nav_to_pid,$print_drupal_me
         $path_to_pid = array($path_list[0]);
       $tree = '';
 	if (variable_get('si_exhibition_file_cache', FALSE)) {
-	  watchdog('exhibition','si_exhibition_get_item_display_config, Getting pid tree from cache');
+          si_exhibition_debug('si_exhibition_get_item_display_config, Getting pid tree from cache', NULL,TRUE);
           $tree = _si_exhibition_get_pid_tree_from_cache($path_list[0]);
 	}	
 	if (empty($tree)) {
 	  $tree = _si_exhibition_get_pid_tree($path_list[0], null, $tree_pid_list,$path_to_pid);
 	  if (variable_get('si_exhibition_file_cache', FALSE)) {
 	    $return_from_write = _si_exhibition_get_pid_tree_to_cache($path_list[0],$tree);
-             watchdog("exhibition",'si_exhibition_get_item_display_config, writing to file cache :'.$return_from_write);
+            si_exhibition_debug('si_exhibition_get_item_display_config, writing to file cache :'.$return_from_write, NULL,TRUE);
 	  }	
 	}
 	else {
@@ -2322,6 +2342,9 @@ function si_exhibition_get_printable_tree($tree_pos, $current_path = ''){
   $output .= '</li>';
   return $output;
 }
+/**
+ * Debugging helper, return a stack trace string for use in dsm / dpm / watchdog
+ */
 function exhibition_debug_string_backtrace() {
   ob_start();
   debug_print_backtrace();
@@ -2418,7 +2441,6 @@ function _si_exhibition_get_pid_tree($pid, $owner_id, &$pid_list = array(), $pat
   if ($visibility_settings_check === FALSE) return NULL;
   if (in_array($pid, $pid_list)){
     //already did this, duplicate found:
-    //dsm('found this pid in the tree already:'.$pid);
     $object = $repo->getObject($pid);
     $to_return['label'] = $object->label;
     $to_return['already_in_tree'] = TRUE;
@@ -2626,7 +2648,14 @@ function si_exhibition_get_obj_datastream_content($pid) {
     header("Content-Disposition: attachment; filename=\"$filename\"");
     print $datastream_content;
     drupal_exit();
-}		
+}
+/*
+ * Deliver content directly from Fedora to the user's browser, streaming it to the browser
+ * if necessary
+ *
+ * The streaming as of this writing 10/25/2017 is exclusively for video, all others are small enough or
+ * streaming is not desired
+ */
 function si_exhibition_deliver_streaming($pid, $dsid = 'OBJ') {
   $repo = tuque_wrapper_get_repository_instance();
   $object = $repo->getObject($pid);
@@ -2796,7 +2825,28 @@ function si_exhibition_get_degradation_level($pid_to_check) {
     return $se['image_degradation'];
   }
   return '2';
-} 
+}
+/*
+ * returns the visibility object obtained from the workbench server, should be of the type:
+ * array(
+ *   'pid' => $pid, // passed in pid
+ *   'label' => 'this has a name',
+ *   'show_name' => 1,
+ *   ...
+ *   'children' => array(
+ *     array(
+ *       'pid' => $to_check_pid, // passed in pid
+ *       'label' => 'this has a name',
+ *       'show_name' => 1,
+ *       ...
+ *     ),
+ *     array( ... )
+ *   ...
+ *   )
+ * $pid - pid that is the one we want to see the children for
+ * 
+ * $path_to_pid - only pass in if it can't be obtained through normal means of getting it via the URL (unlikely)
+ */
 function si_exhibition_get_visibility_tree_children($pid = NULL,$path_to_pid = NULL) {
   if ($pid === NULL) {
     $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
@@ -2807,13 +2857,17 @@ function si_exhibition_get_visibility_tree_children($pid = NULL,$path_to_pid = N
   if ($path_to_pid == NULL) {
     $parent_pid_path = si_exhibition_get_pid_path_to_showing_concept();
     if (!empty($parent_pid_path)){
+      // We want the pid path to END ON the pid passed in, we assume no circular tree for exhibition
+      while ($parent_pid_path[sizeof($parent_pid_path) - 1] != $pid) {
+        array_pop($parent_pid_path);
+      }
       $path_to_pid = implode('_',$parent_pid_path);
-     }
-   }	
-   if ($path_to_pid == '') $path_to_pid = $pid; 	
+    }
+  }
+  if ($path_to_pid == '') $path_to_pid = $pid; 	
   $url_to_get = variable_get('si_exhibition_visibility_info_url', '');
   $url_to_get = si_exhibition_get_optimized_url($url_to_get,'json_visibility_children') . urlencode($path_to_pid);
-  watchdog("exhibition",'si_exhibition_get_visibility_tree_children: url to get'.$url_to_get);
+  si_exhibition_debug('si_exhibition_get_visibility_tree_children: url to get'.$url_to_get, NULL,TRUE);
   if (array_key_exists($url_to_get, $GLOBALS)) {
     return $GLOBALS[$url_to_get];
   }

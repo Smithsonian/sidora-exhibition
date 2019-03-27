@@ -198,10 +198,13 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   $view = '';
   if ($resource['visibility']['show_preview']){ //Do not show the "preview" thumbnail & link if preview is off
     $available_view = '';
-    if (is_array($display['view'])) foreach($display['view'] as $curr_view) if (array_search($curr_view, $resource['datastreams']) !== FALSE) $available_view = $curr_view;
+    if (!empty($display['view']) && is_array($display['view'])) 
+      foreach($display['view'] as $curr_view) 
+        if (array_search($curr_view, $resource['datastreams']) !== FALSE) 
+          $available_view = $curr_view;
     if (!empty($available_view)){ $display['view'] = $available_view;  }
     $preview = '';
-    if (array_search($display['view'], $resource['datastreams']) !== FALSE) {
+    if (!empty($display['view']) && array_search($display['view'], $resource['datastreams']) !== FALSE) {
 	//$thumbnail_url = url("fedora/repository/{$resource['pid']}/TN/tn.jpg")."?path=".implode(',',si_exhibition_get_pid_path_to_showing_concept());
 	$thumbnail_url = url("si/exhibition/tn/{$resource['pid']}/TN/tn.jpg")."?path=".implode(',',si_exhibition_get_pid_path_to_showing_concept());
       if (array_search('si:datasetCModel', $resource['models']) !== FALSE) {
@@ -238,13 +241,15 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   }
 
   // Type
-  list($icon, $type) = $display['type'];
-  $type = "<div class='r-icon $icon title='$type'>$type</div>";
+  if (!empty($display['type'])){
+    list($icon, $type) = $display['type'];
+    $type = "<div class='r-icon $icon title='$type'>$type</div>";
+  }
   // Download
   $download = '';
 
   $available_dsid = '';
-  if (is_array($display['dsid'])){
+  if (!empty($display['dsid']) && is_array($display['dsid'])){
     foreach($display['dsid'] as $curr_dsid) {
       if (array_search($curr_dsid, $resource['datastreams']) !== FALSE) {
         $available_dsid = $curr_dsid;
@@ -253,7 +258,7 @@ function _si_exhibition_get_resource_table_row(array $resource) {
   }
   if (!empty($available_dsid)){ $display['dsid'] = $available_dsid;  }
 
-  if (array_search($display['dsid'], $resource['datastreams']) !== FALSE) {
+  if (!empty($display['dsid']) && array_search($display['dsid'], $resource['datastreams']) !== FALSE) {
 		$download = l('Download', 'fedora/download/' . $resource['pid'], array('class'=> $display['class']));
 	}
 
@@ -339,7 +344,7 @@ function theme_si_exhibition_parent_concepts($vars) {
 }
 */
 function theme_si_exhibition_parent_concepts($vars) {
-  watchdog("exhibition",'theme_si_exhibition_parent_concepts, pid:'.$vars['pid']);
+  si_exhibition_debug('theme_si_exhibition_parent_concepts, pid:'.$vars['pid']);
   $pid = $vars['pid'];
   global $main_path;
   $full_path = (isset($_GET['path']) ? $_GET['path'] : '');
@@ -384,7 +389,7 @@ function theme_si_exhibition_parent_concepts($vars) {
  * Displays a list of child concepts links along with their number of children.
  */
 function theme_si_exhibition_child_concepts($vars){
-  watchdog("exhibition",'theme_si_exhibition_child_concepts, pid:'.$vars['pid']);
+  si_exhibition_debug('theme_si_exhibition_child_concepts, pid:'.$vars['pid']);
   $pid = $vars['pid'];
   global $main_path;
   $header ='<h3>' . t('Child concepts') . '</h3>';
@@ -438,7 +443,7 @@ function HandleXmlError($errno, $errstr, $errfile, $errline)
  */
 function theme_si_exhibition_metadata_xmls($vars){
   $pid = $vars['pid'];
-  watchdog("exhibition",'in theme metadata, pid:'.$pid);
+  si_exhibition_debug('in theme metadata, pid:'.$pid);
   if (variable_get('si_exhibition_anonymous_only', FALSE)){
     if (!si_exhibition_check_view_permission($pid)){
       si_exhibition_debug('view_permission was false');
